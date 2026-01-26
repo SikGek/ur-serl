@@ -17,8 +17,10 @@ class UR5CornerConfig(DefaultEnvConfig):
     RANDOM_ROT_RANGE = (0.0,)
     # ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])
     # ABS_POSE_LIMIT_LOW = np.array([-0.3, -0.7, -0.006, 3.0, -0.1, -3.2])
-    ABS_POSE_LIMIT_HIGH = np.array([0.05, 0.1, 0.22, 3.2, 0.1, 3.2])
-    ABS_POSE_LIMIT_LOW = np.array([-0.49, -0.75, -0.006, 3.0, -0.1, -3.2])
+    # ABS_POSE_LIMIT_HIGH = np.array([0.05, 0.1, 0.22, 3.2, 0.1, 3.2])
+    ABS_POSE_LIMIT_HIGH = np.array([0.05, 0.1, 0.22, 0.1, 0.1, 0.1])
+    # ABS_POSE_LIMIT_LOW = np.array([-0.49, -0.75, -0.006, 3.0, -0.1, -3.2])
+    ABS_POSE_LIMIT_LOW = np.array([-0.49, -0.75, -0.006, -0.1, -0.1, -0.1])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "172.22.22.2"
