@@ -36,8 +36,9 @@ if __name__ == "__main__":
                    camera_mode="none",
                    max_episode_length=100,
                    )
-    env = SpacemouseIntervention(env)
+    
     env = RelativeFrame(env)
+    env = SpacemouseIntervention(env)
     env = ToMrpWrapper(env)
     env = ScaleObservationWrapper(env)
     # env = ObservationRotationWrapper(env)       # if it should be enabled
