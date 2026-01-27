@@ -15,6 +15,7 @@ from serl_launcher.agents.continuous.sac import SACAgent
 from serl_launcher.agents.continuous.drq import DrQAgent
 from serl_launcher.agents.continuous.vice import VICEAgent
 from serl_launcher.agents.continuous.bc_noimg import BCAgentNoImg
+from serl_launcher.agents.continuous.bc_traj_box import BCAgentTrajBox
 
 from serl_launcher.data.data_store import (
     MemoryEfficientReplayBufferDataStore,
@@ -53,6 +54,28 @@ def make_bc_agent_no_img(
         seed, sample_obs, sample_action
 ):
     return BCAgentNoImg.create(
+        jax.random.PRNGKey(seed),
+        sample_obs,
+        sample_action,
+        network_kwargs={
+            "activations": nn.tanh,
+            "use_layer_norm": False,
+            "hidden_dims": [256, 256],
+            # "hidden_dims": [128, 64],
+        },
+        policy_kwargs={
+            "tanh_squash_distribution": False,
+            "std_parameterization": "exp",
+            "std_min": 1e-5,
+            "std_max": 5,
+        },
+    )
+    
+    
+def make_bc_agent_traj_box(
+        seed, sample_obs, sample_action
+):
+    return BCAgentTrajBox.create(
         jax.random.PRNGKey(seed),
         sample_obs,
         sample_action,
@@ -108,11 +131,12 @@ def make_drq_agent(
         sample_action,
         image_keys=("image",),
         encoder_type="small",
-        state_mask="all",
+        state_mask="no_ForceTorque",
+        # proprio_latent_dim=64,
         encoder_kwargs=None
 ):
     if encoder_kwargs is None:
-        encoder_kwargs = dict(bottleneck_dim=64)
+        encoder_kwargs = dict(bottleneck_dim=128)
 
     agent = DrQAgent.create_drq(
         jax.random.PRNGKey(seed),
@@ -121,31 +145,31 @@ def make_drq_agent(
         encoder_type=encoder_type,
         use_proprio=True,
         state_mask=state_mask,
-        # proprio_latent_dim=128,
+        # proprio_latent_dim=proprio_latent_dim,
         image_keys=image_keys,
         policy_kwargs=dict(
             tanh_squash_distribution=True,
             std_parameterization="exp",
-            std_min=1e-3,  # was 1e-5
-            std_max=3,  # was 5
+            std_min=1e-5,
+            std_max=5,
         ),
         critic_network_kwargs=dict(
-            activations=nn.relu,
+            activations=nn.tanh,
             use_layer_norm=True,
             hidden_dims=[256, 256],
-            dropout_rate=0.0  # was 0.1
+            dropout_rate=0.1
         ),
         policy_network_kwargs=dict(
-            activations=nn.relu,
+            activations=nn.tanh,
             use_layer_norm=True,
             hidden_dims=[256, 256],
-            dropout_rate=0.0
+            dropout_rate=0.1
         ),
-        temperature_init=1e-1,  # was 1e-3
+        temperature_init=1e-2,
         discount=0.99,  # 0.99
         backup_entropy=True,  # default: False
-        critic_ensemble_size=2,         # changed from 10 to 5
-        critic_subsample_size=None,
+        critic_ensemble_size=10,
+        critic_subsample_size=2,
         encoder_kwargs=encoder_kwargs,
         # dict(
         #     # pooling_method="spatial_softmax",        # default "spatial_learned_embeddings"
@@ -154,10 +178,10 @@ def make_drq_agent(
         #     # num_kp=64,
         # ),
         actor_optimizer_kwargs={
-            "learning_rate": 3e-4,  # was 3e-4
+            "learning_rate": 3e-3,  # 3e-4
         },
         critic_optimizer_kwargs={
-            "learning_rate": 3e-4,  # was 3e-4
+            "learning_rate": 3e-3,  # 3e-4
         },
     )
     return agent
@@ -263,21 +287,18 @@ def make_replay_buffer(
     - image_keys: list of image keys, used only "memory_efficient_replay_buffer"
     - preload_rlds_path: path to preloaded RLDS trajectories
     """
-    # print("shape of observation space and action space")
-    # print(env.observation_space)
-    # print(env.action_space)
 
     # init logger for RLDS
     if rlds_logger_path:
         # from: https://github.com/rail-berkeley/oxe_envlogger
         from oxe_envlogger.rlds_logger import RLDSLogger
+
         rlds_logger = RLDSLogger(
             observation_space=env.observation_space,
             action_space=env.action_space,
-            dataset_name="voxel_serl_rlds_dataset",
+            dataset_name="serl_rlds_dataset",
             directory=rlds_logger_path,
-            max_episodes_per_file=10,
-            max_steps_per_episode=env.env_left.max_episode_length
+            max_episodes_per_file=5,  # TODO: arbitrary number
         )
     else:
         rlds_logger = None

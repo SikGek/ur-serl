@@ -22,13 +22,13 @@ class MLP(nn.Module):
 
         for i, size in enumerate(self.hidden_dims):
             x = nn.Dense(size, kernel_init=default_init())(x)
-            x = activations(x)
 
             if i + 1 < len(self.hidden_dims) or self.activate_final:
                 if self.dropout_rate is not None and self.dropout_rate > 0:
                     x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
                 if self.use_layer_norm:
                     x = nn.LayerNorm()(x)
+                x = activations(x)
         return x
 
 

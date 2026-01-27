@@ -6,13 +6,6 @@ import mujoco
 import numpy as np
 from gymnasium import spaces
 
-try:
-    import mujoco_py
-except ImportError as e:
-    MUJOCO_PY_IMPORT_ERROR = e
-else:
-    MUJOCO_PY_IMPORT_ERROR = None
-
 from franka_sim.controllers import opspace
 from franka_sim.mujoco_gym_env import GymRenderingSpec, MujocoGymEnv
 
@@ -137,8 +130,6 @@ class PandaPickCubeGymEnv(MujocoGymEnv):
             dtype=np.float32,
         )
 
-        # NOTE: gymnasium is used here since MujocoRenderer is not available in gym. It
-        # is possible to add a similar viewer feature with gym, but that can be a future TODO
         from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
 
         self._viewer = MujocoRenderer(

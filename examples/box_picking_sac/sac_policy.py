@@ -33,7 +33,7 @@ from serl_launcher.utils.launcher import (
 )
 
 from serl_launcher.wrappers.serl_obs_wrappers import SerlObsWrapperNoImages
-from ur_env.envs.wrappers import SpacemouseIntervention, ToMrpWrapper
+from ur_env.envs.wrappers import SpacemouseIntervention, Quat2MrpWrapper
 
 import ur_env
 
@@ -67,13 +67,13 @@ flags.DEFINE_boolean("learner", False, "Is this a learner or a trainer.")
 flags.DEFINE_boolean("actor", False, "Is this a learner or a trainer.")
 flags.DEFINE_string("ip", "localhost", "IP address of the learner.")
 flags.DEFINE_integer("checkpoint_period", 10000, "Period to save checkpoints.")
-flags.DEFINE_string("checkpoint_path", '/home/nico/real-world-rl/serl/examples/box_picking_sac/checkpoints',
+flags.DEFINE_string("checkpoint_path", '/home/andrea/Code/voxel-serl/examples/robotiq_sac/checkpoints',
                     "Path to save checkpoints.")
 
 flags.DEFINE_integer("eval_checkpoint_step", 0, "evaluate the policy from ckpt at this step")
 flags.DEFINE_string("eval_checkpoint_path", None, "evaluate the policy from ckpt from this path")
 
-flags.DEFINE_string("log_rlds_path", '/home/nico/real-world-rl/serl/examples/box_picking_sac/rlds',
+flags.DEFINE_string("log_rlds_path", '/home/andrea/Code/voxel-serl/examples/robotiq_sac/rlds',
                     "Path to save RLDS logs.")
 flags.DEFINE_string("preload_rlds_path", None, "Path to preload RLDS data.")
 
@@ -315,7 +315,7 @@ def main(_):
     if FLAGS.actor:
         env = SpacemouseIntervention(env)
     env = RelativeFrame(env)
-    env = ToMrpWrapper(env)
+    env = Quat2MrpWrapper(env)
     env = SerlObsWrapperNoImages(env)
     # env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
     # env = TransformReward(env, lambda r: FLAGS.reward_scale * r)

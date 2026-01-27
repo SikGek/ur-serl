@@ -20,10 +20,9 @@ from ur_env.camera.video_capture import VideoCapture
 from ur_env.camera.rs_capture import RSCapture
 
 from ur_env.camera.utils import PointCloudFusion, CalibrationTread
+from ur_env.utils.pose_estimation import BoxPoseEstimation
 
-# from robot_controllers.ur_sim_controller import MujocoUrImpedanceController as UrImpedanceController
 from robot_controllers.ur5_controller import UrImpedanceController
-from robot_controllers.controller_client import ControllerClientWithGripper
 
 
 class ImageDisplayer(threading.Thread):
@@ -48,53 +47,34 @@ class ImageDisplayer(threading.Thread):
 
 
 class PointCloudDisplayer:
-    def __init__(self, left=100, top=100):
+    def __init__(self):
         self.window = o3d.visualization.Visualizer()
-        self.window.create_window(height=500, width=500, visible=True, left=left, top=top)
+        self.window.create_window(height=400, width=400, visible=True)
 
         self.pc = o3d.geometry.PointCloud()
         self.window.get_render_option().load_from_json(
-            "/home/nico/real-world-rl/serl/serl_robot_infra/ur_env/camera/render_options.json")
+            "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/render_options.json")
 
         self.param = o3d.io.read_pinhole_camera_parameters(
-            "/home/nico/real-world-rl/serl/serl_robot_infra/ur_env/camera/camera_parameters.json")
+            "/home/nico/.config/JetBrains/PyCharm2024.1/scratches/camera_parameters.json")
         self.ctr = self.window.get_view_control()
         self.coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.01, origin=[0, 0, 0])
 
     def display(self, points):
         self.pc.clear()
         # MASSIVE! speed up if float64 is used, see: https://github.com/isl-org/Open3D/issues/1045
-        self.pc.points = o3d.utility.Vector3dVector(points[:, :3].astype(np.float64))       # weird bug...
-        if points.shape[1] == 6:
-            self.pc.colors = o3d.utility.Vector3dVector(points[:, 3:].astype(np.float64) / 255.)
+        self.pc.points = o3d.utility.Vector3dVector(points.astype(np.float64) / 1000.)
         self.window.clear_geometries()
         self.window.add_geometry(self.pc)
-        self.window.add_geometry(self.coord_frame)
+        # self.window.add_geometry(self.coord_frame)
         self.ctr.convert_from_pinhole_camera_parameters(self.param, True)
 
         self.window.poll_events()
-        self.window.update_renderer()
-        # self.window.run()
-        # final_params = self.ctr.convert_to_pinhole_camera_parameters()
-        # print("\n=== Final Camera Pinhole Parameters ===")
-        # print("Intrinsic matrix:\n", final_params.intrinsic.intrinsic_matrix)
-        # print("Extrinsic matrix (camera pose):\n", final_params.extrinsic)
+        # self.window.update_renderer()
 
     def close(self):
         self.window.destroy_window()
 
-class PointCloudDummyDisplayer:
-    def __init__(self):
-        self.points = []
-
-    def display(self, points):
-        self.points.append(points)
-
-    def get(self):
-        if len(self.points):
-            return self.points.pop(0)
-        else:
-            raise RuntimeError("No points appended")
 
 ##############################################################################
 
@@ -104,8 +84,7 @@ class DefaultEnvConfig:
 
     RESET_Q = np.zeros((6,))
     RANDOM_RESET = (False,)
-    RANDOM_POSITION_RANGE = (0.0,)
-    RANDOM_Z_RANGE = (0.0)
+    RANDOM_XY_RANGE = (0.0,)
     RANDOM_ROT_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
@@ -125,9 +104,6 @@ class DefaultEnvConfig:
         "shoulder": "",
         "wrist": "",
     }
-    VOXEL_PARAMS: Dict = {}
-    CAMERA_PARAMS: Dict = {}
-    CALIBRATION_PATH: str = ""
 
 
 ##############################################################################
@@ -139,18 +115,15 @@ class UR5Env(gym.Env):
             hz: int = 10,
             fake_env=False,
             config=DefaultEnvConfig,
-            max_episode_length: int = 100,
+            max_episode_length: int = 200,
             save_video: bool = False,
-            camera_mode: str = "rgb",  # one of (rgb, grey, depth, both(rgb depth), pointcloud, none)
-            visualize_camera_mode: bool = True,
-            ema_alpha: float = 0.2,
+            camera_mode: str = "none",  # one of (rgb, grey, depth, both(rgb depth), pointcloud, none)
     ):
         self.max_episode_length = max_episode_length
         self.curr_path_length = 0
         self.action_scale = config.ACTION_SCALE
 
         self.config = config
-        self.ema_alpha = float(ema_alpha)
 
         self.resetQ = config.RESET_Q
         self.curr_reset_pose = np.zeros((7,), dtype=np.float32)
@@ -161,18 +134,26 @@ class UR5Env(gym.Env):
         self.curr_Qd = np.zeros((6,), dtype=np.float32)
         self.curr_force = np.zeros((3,), dtype=np.float32)
         self.curr_torque = np.zeros((3,), dtype=np.float32)
-        self.curr_timestamp_diff = np.zeros((1,), dtype=np.float32)
-        self.ema_force = np.zeros((6,), dtype=np.float32)
-        self.ema_tcp_vel = np.zeros((6,), dtype=np.float32)
-
-        self.last_state_timestamp = None
-        self.curr_timestamp = None
-        self.neutral_gripper_command = False
+        
+        self.pose_estimation_ip = config.POSE_ESTIMATION_IP
+        self.pose_est = config.POSE_ESTIMATION
+        self.WF_rot = config.WF_rot
+        self.residual_learning_inference = True
+        self.box_error = config.BOX_ERROR
+        self.low_pass_filter_k = config.LOW_PASS_FILTER
+        
+        # boxes
+        self.box_pose_est = BoxPoseEstimation(self.pose_estimation_ip) if config.POSE_ESTIMATION else None
+        self.goal_pose = np.zeros((3,), dtype=np.float32)
+        self.box_position = np.zeros((3,), dtype=np.float32)
+        self.box_orientation = np.zeros((3,), dtype=np.float32)
+        self.init_box_orientation = np.zeros((3,), dtype=np.float32)
+        self._get_goal_pose()
+        self.rotation_generalization = config.ROTATION_GENERALIZATION
 
         self.gripper_state = np.zeros((2,), dtype=np.float32)
         self.random_reset = config.RANDOM_RESET
-        self.random_position_range = config.RANDOM_POSITION_RANGE
-        self.random_z_range = config.RANDOM_Z_RANGE
+        self.random_xy_range = config.RANDOM_XY_RANGE
         self.random_rot_range = config.RANDOM_ROT_RANGE
         self.hz = hz
         np.random.seed(0)        # fix seed for fixed (random) initial rotations
@@ -183,7 +164,6 @@ class UR5Env(gym.Env):
         self.save_video = save_video
         self.recording_frames = []
         self.camera_mode = camera_mode
-        self.visualize_camera_mode = visualize_camera_mode
 
         self.cost_infos = {}
 
@@ -234,35 +214,29 @@ class UR5Env(gym.Env):
 
         if camera_mode in ["pointcloud"]:
             image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
-                0, 255, shape=config.VOXEL_PARAMS["voxel_grid_shape"], dtype=np.uint8
+                0, 255, shape=(50, 50, 40), dtype=np.uint8
             )
-        if camera_mode in ["rgb_pointcloud"]:
-            image_space_definition["wrist_pointcloud"] = gym.spaces.Box(
-                0, 255, shape=(*config.VOXEL_PARAMS["voxel_grid_shape"], 4), dtype=np.uint8
-            )
-        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "rgb_pointcloud", "grey"]:
+        if camera_mode is not None and camera_mode not in ["rgb", "both", "depth", "pointcloud", "grey"]:
             raise NotImplementedError(f"camera mode {camera_mode} not implemented")
 
         state_space = gym.spaces.Dict(
             {
                 "tcp_pose": gym.spaces.Box(
-                    -np.inf, np.inf, shape=(7,)
-                ),  # xyz + quat
+                    -np.inf, np.inf, shape=(6,)
+                ),  # xyz + rotvec
                 "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
                 "gripper_state": gym.spaces.Box(-1., 1., shape=(2,)),
                 "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 "action": gym.spaces.Box(-1., 1., shape=self.action_space.shape),
-                "time_diff": gym.spaces.Box(0., np.inf, shape=(1,)),
-                "ema_force": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
-                "ema_tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
+                "boxes": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
+                "trajectory": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
+                "goal_pose": gym.spaces.Box(-np.inf, np.inf, shape=(6,))
             }
         )
 
-        obs_space_definition = gym.spaces.Dict(
-            {"state": state_space}
-        )
-        if self.camera_mode in ["rgb", "both", "depth", "pointcloud", "rgb_pointcloud", "grey"]:
+        obs_space_definition = {"state": state_space}
+        if self.camera_mode in ["rgb", "both", "depth", "pointcloud", "grey"]:
             obs_space_definition["images"] = gym.spaces.Dict(
                 image_space_definition
             )
@@ -279,48 +253,43 @@ class UR5Env(gym.Env):
 
         self.controller = UrImpedanceController(
             robot_ip=config.ROBOT_IP,
-            config=config
+            frequency=config.CONTROLLER_HZ,
+            kp=15000,
+            kd=3300,
+            config=config,
+            verbose=False,
+            plot=False,
         )
-        # self.controller = UrImpedanceController(
-        #             robot_ip="127.0.0.1",
-        #             config=config
-        #         )
         self.controller.start()  # start Thread
 
         if self.camera_mode is not None:
             self.init_cameras(config.REALSENSE_CAMERAS)
             self.img_queue = queue.Queue()
-            if self.visualize_camera_mode:
-                if self.camera_mode in ["pointcloud", "rgb_pointcloud"]:
-                    self.displayer = PointCloudDisplayer()  # o3d displayer cannot be threaded :/
-                else:
-                    self.displayer = ImageDisplayer(self.img_queue)
-                    self.displayer.start()
+            if self.camera_mode in ["pointcloud"]:
+                self.displayer = PointCloudDisplayer()  # o3d displayer cannot be threaded :/
             else:
-                if self.camera_mode in ["pointcloud", "rgb_pointcloud"]:
-                    self.displayer = PointCloudDummyDisplayer()             # save the points for use in dual PC
-
+                self.displayer = ImageDisplayer(self.img_queue)
+                self.displayer.start()
             print("[CAM] Cameras are ready!")
 
         while not self.controller.is_ready():  # wait for controller
             time.sleep(0.1)
         print("[RIC] Controller has started and is ready!")
 
-        if self.camera_mode in ["pointcloud", "rgb_pointcloud"]:
+        if self.camera_mode in ["pointcloud"]:
             voxel_grid_shape = np.array(self.observation_space["images"]["wrist_pointcloud"].shape)
-            if voxel_grid_shape.shape[0] == 4:
-                voxel_grid_shape = voxel_grid_shape[:3]
             # voxel_grid_shape[-1] *= 8     # do not use compacting for now
             # voxel_grid_shape *= 2
             print(f"pointcloud resolution set to: {voxel_grid_shape}")
-            self.pointcloud_fusion = PointCloudFusion(self.config.CAMERA_PARAMS, self.config.VOXEL_PARAMS)
+            self.pointcloud_fusion = PointCloudFusion(angle=30.5, x_distance=0.185, y_distance=-0.01, voxel_grid_shape=voxel_grid_shape)
 
-            # calibration is disabled for now
-            # if False:
-            #     self.calibration_thread = CalibrationTread(pc_fusion=self.pointcloud_fusion, verbose=True)
-            #     self.calibration_thread.start()
-            #
-            #     self.calibrate_pointcloud_fusion(visualize=True)
+            # load pre calibrated, else calibrate
+            if not self.pointcloud_fusion.load_finetuned():
+                # TODO make calibration more robust!
+                self.calibration_thread = CalibrationTread(pc_fusion=self.pointcloud_fusion, verbose=True)
+                self.calibration_thread.start()
+
+                self.calibrate_pointcloud_fusion(visualize=True)
 
     def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:
         """Clip the pose to be within the safety box."""
@@ -337,49 +306,44 @@ class UR5Env(gym.Env):
 
     def get_cost_infos(self, done):
         if not done:
-            return {}
+            return self.cost_infos.copy()
         cost_infos = self.cost_infos.copy()
         self.cost_infos = {}
         return cost_infos
 
-    def step(self, action: np.ndarray) -> tuple:
+    def step(self, action: np.ndarray) -> tuple:  # overwritten by box_placing_env.py
         """standard gym step function."""
         start_time = time.time()
-        
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         # position
         next_pos = self.curr_pos.copy()
-        next_pos[:3] += action[:3] * self.action_scale[0]
+        next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0] # + self.trajectory_dir
+
         next_pos[3:] = (
                 R.from_mrp(action[3:6] * self.action_scale[1] / 4.) * R.from_quat(next_pos[3:])
         ).as_quat()             # c * r  --> applies c after r
+
         gripper_action = action[6] * self.action_scale[2]
 
         safe_pos = self.clip_safety_box(next_pos)
-        self.send_pos_command(safe_pos)
-        self.send_gripper_command(gripper_action)
-        # print(f"sent pose: {safe_pos}  with action {action}    actual pose: {self.curr_pos}")
+        self._send_pos_command(safe_pos)
+        self._send_gripper_command(gripper_action)
+
         self.curr_path_length += 1
 
-        # wait
-        dt = time.time() - start_time
-        to_sleep = max(0., (1. / self.hz) - dt)
-        time.sleep(to_sleep)
-
-        # get next observation
         obs = self._get_obs(action)
-
-        current_force6 = np.concatenate((self.curr_force, self.curr_torque)).astype(np.float32)
-        self.ema_force = (1.0 - self.ema_alpha) * self.ema_force + self.ema_alpha * current_force6
-        self.ema_tcp_vel = (1.0 - self.ema_alpha) * self.ema_tcp_vel + self.ema_alpha * self.curr_vel
-        obs["state"]["ema_force"] = self.ema_force.copy()
-        obs["state"]["ema_tcp_vel"] = self.ema_tcp_vel.copy()
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
-        reward = reward if not truncated else reward - 200.  # truncation penalty
+        reward = reward if not truncated else reward - 10.  # truncation penalty
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
+
+        dt = time.time() - start_time
+        to_sleep = max(0, (1.0 / self.hz) - dt)
+        if to_sleep == 0:
+            warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
+        time.sleep(to_sleep)
 
         return obs, reward, done, truncated, self.get_cost_infos(done)
 
@@ -389,7 +353,7 @@ class UR5Env(gym.Env):
     def reached_goal_state(self, obs) -> bool:
         return False  # overwrite for each task
 
-    def go_to_rest(self, deactiveate_gripper: bool = True):
+    def go_to_rest(self):
         """
         The concrete steps to perform reset should be
         implemented each subclass for the specific task.
@@ -401,22 +365,22 @@ class UR5Env(gym.Env):
         if self.resetQ.shape == (1, 6):
             reset_Q[:] = self.resetQ.copy()
         elif self.resetQ.shape[1] == 6 and self.resetQ.shape[0] > 1:
-            reset_Q[:] = self.resetQ[0, :].copy()
+            reset_Q[:] = self.resetQ[0, :].copy()  # make random guess
             self.resetQ[:] = np.roll(self.resetQ, -1, axis=0)  # roll one (not random)
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
 
-        self.send_reset_command(reset_Q)
+        self._send_reset_command(reset_Q)
 
         while not self.controller.is_reset():
             time.sleep(0.1)  # wait for the reset operation
 
-        self.update_currpos()
-        reset_pose = np.asarray(self.controller.get_state()["pos"])
+        self._update_currpos()
+        reset_pose = self.controller.get_target_pos()
 
         if self.random_reset:  # randomize reset position in xy plane
-            reset_shift = np.random.uniform(np.negative(self.random_position_range), self.random_position_range, (3,))
-            reset_pose[:3] += reset_shift
+            reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
+            reset_pose[:2] += reset_shift
 
             if self.random_rot_range[0] > 0.:
                 random_rot = np.random.triangular(np.negative(self.random_rot_range), 0., self.random_rot_range, size=(3,))
@@ -426,7 +390,7 @@ class UR5Env(gym.Env):
 
             self.curr_reset_pose[:] = reset_pose
 
-            self.controller.set_target_pose(reset_pose)  # random movement after resetting
+            self.controller.set_target_pos(reset_pose)  # random movement after resetting
             time.sleep(0.1)
             while self.controller.is_moving():
                 time.sleep(0.1)
@@ -442,22 +406,22 @@ class UR5Env(gym.Env):
         if self.gripper_state[0] > 0.01:
             reset_Q = self.curr_Q.copy()
             reset_Q[:4] = [0., -np.pi / 2., np.pi / 2., -np.pi / 2.]
-            self.send_reset_command(reset_Q)
+            self._send_reset_command(reset_Q)
             while not self.controller.is_reset():
                 time.sleep(0.1)  # wait for the reset operation
 
             reset_Q[:4] = [np.pi / 2, -np.pi / 2., np.pi / 2., -np.pi / 2.]
-            self.send_reset_command(reset_Q)
+            self._send_reset_command(reset_Q)
             while not self.controller.is_reset():
                 time.sleep(0.1)  # wait for the reset operation
 
             # release the box
-            self.send_gripper_command(np.array(-1))
+            self._send_gripper_command(np.array(-1))
             time.sleep(0.1)
 
         # go back on top
         reset_Q = [0., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.]
-        self.send_reset_command(reset_Q)
+        self._send_reset_command(reset_Q)
         while not self.controller.is_reset():
             time.sleep(0.1)  # wait for the reset operation
         time.sleep(0.5)
@@ -491,11 +455,11 @@ class UR5Env(gym.Env):
         init_pose = np.concatenate((pos, rot))
 
         print(f"moving to {init_pose}")
-        self.send_pos_command(init_pose)
+        self._send_taskspace_command(init_pose)
         while not self.controller.is_reset():
             time.sleep(0.1)  # wait for the reset operation
 
-        self.update_currpos()
+        self._update_currpos()
         self.curr_reset_pose[:] = self.curr_pos
 
     def reset(self, **kwargs):
@@ -505,16 +469,8 @@ class UR5Env(gym.Env):
 
         shift = self.go_to_rest()
         self.curr_path_length = 0
-        self.last_state_timestamp = None
 
         obs = self._get_obs(np.zeros_like(self.last_action))
-
-        current_force = np.concatenate((self.curr_force, self.curr_torque)).astype(np.float32)
-        self.ema_force[:] = current_force
-        self.ema_tcp_vel[:] = self.curr_vel
-        obs["state"]["ema_force"] = self.ema_force.copy()
-        obs["state"]["ema_tcp_vel"] = self.ema_tcp_vel.copy()
-        
         return obs, {"reset_shift": shift}
 
     def save_video_recording(self):
@@ -544,26 +500,29 @@ class UR5Env(gym.Env):
             rgb = self.camera_mode in ["rgb", "both", "grey"]
             depth = self.camera_mode in ["depth", "both"]
             pointcloud = self.camera_mode in ["pointcloud"]
-            rgb_pc = self.camera_mode in ["rgb_pointcloud"]
             cap = VideoCapture(
-                RSCapture(name=cam_name, serial_number=cam_serial, fps=30, rgb=rgb, depth=depth, pointcloud=pointcloud, rgb_pointcloud=rgb_pc)
+                RSCapture(name=cam_name, serial_number=cam_serial, rgb=rgb, depth=depth, pointcloud=pointcloud)
             )
             self.cap[cam_name] = cap
 
     def crop_image(self, name, image) -> np.ndarray:
         """Crop realsense images to be a square."""
-        return image[:, 124:604, :]
+        if name == "wrist":
+            return image[:, 124:604, :]
+        elif name == "wrist_2":
+            return image[:, 124:604, :]
+        else:
+            raise ValueError(f"Camera {name} not recognized in cropping")
 
-    def get_image(self) -> Tuple[Dict[str, np.ndarray], int]:
+    def get_image(self) -> Dict[str, np.ndarray]:
         """Get images from the realsense cameras."""
         images = {}
         display_images = {}
-        timestamp = 0
-        if self.camera_mode in ["pointcloud", "rgb_pointcloud"]:
+        if self.camera_mode == "pointcloud":
             self.pointcloud_fusion.clear()
         for key, cap in self.cap.items():
             try:
-                image, timestamp = cap.read()
+                image = cap.read()
                 if self.camera_mode in ["rgb", "both", "grey"]:
                     rgb = image[..., :3].astype(np.uint8)
                     cropped_rgb = self.crop_image(key, rgb)
@@ -598,18 +557,23 @@ class UR5Env(gym.Env):
                     display_images[depth_key] = cv2.applyColorMap(resized, cv2.COLORMAP_JET)
                     display_images[depth_key + "_full"] = cv2.applyColorMap(cropped_depth, cv2.COLORMAP_JET)
 
-                if self.camera_mode in ["pointcloud", "rgb_pointcloud"]:
+                if self.camera_mode in ["pointcloud"]:
                     pointcloud = image
-                    self.pointcloud_fusion.append(pointcloud, key)
+                    self.pointcloud_fusion.append(pointcloud)
 
             except queue.Empty:
                 input(f"{key} camera frozen. Check connect, then press enter to relaunch...")
                 self.init_cameras(self.config.REALSENSE_CAMERAS)
                 return self.get_image()
 
-        if self.camera_mode in ["pointcloud", "rgb_pointcloud"]:
+        if self.camera_mode in ["pointcloud"]:
             voxel_grid, voxel_indices = self.pointcloud_fusion.get_pointcloud_representation(voxelize=True)
+
+            # downsample on 2x2x2 grid with sum of points (8 as max)
+            # vs = self.observation_space["images"]["wrist_pointcloud"].shape
+            # voxel_grid = np.sum(np.reshape(voxel_grid, (vs[0], 2, vs[1], 2, vs[2], 2)), axis=(1, 3, 5))
             images["wrist_pointcloud"] = voxel_grid.astype(np.uint8)
+
             self.displayer.display(voxel_indices)
 
         # self.recording_frames.append(
@@ -617,10 +581,11 @@ class UR5Env(gym.Env):
         # )
         self.img_queue.put(display_images)
 
-        return images, timestamp
+        return images
 
-    def calibrate_pointcloud_fusion(self, visualize=False, num_samples=20):
+    def calibrate_pointcloud_fusion(self, save=True, visualize=False, num_samples=20):
         self.reset()
+        import open3d as o3d
 
         assert self.camera_mode in ["pointcloud"]
         print("calibrating pointcloud fusion...")
@@ -628,7 +593,7 @@ class UR5Env(gym.Env):
 
         obs, reward, done, truncated, _ = self.step(np.zeros((7,)))
         pc = o3d.geometry.PointCloud()
-        fused = self.pointcloud_fusion.get_pointcloud_representation(voxelize=False, crop=False)
+        fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=False, cropped=False)
         pc.points = o3d.utility.Vector3dVector(fused)
         o3d.visualization.draw_geometries([pc])
 
@@ -647,7 +612,23 @@ class UR5Env(gym.Env):
         # calibrate()
         self.controller.stop()
         time.sleep(1)
-        self.calibration_thread.calibrate(visualize=visualize)
+        self.calibration_thread.calibrate()
+
+        if save:
+            self.pointcloud_fusion.save_finetuned()
+
+        if visualize:
+            pc = o3d.geometry.PointCloud()
+            for i in range(num_samples):
+                pc.clear()
+                pcs = self.calibration_thread.pc_backlog[i]
+                self.pointcloud_fusion.clear()
+                self.pointcloud_fusion.append(pcs[0])
+                self.pointcloud_fusion.append(pcs[1])
+                fused = self.pointcloud_fusion.fuse_pointclouds(voxelize=False, cropped=False)
+                pc.points = o3d.utility.Vector3dVector(fused)
+                o3d.visualization.draw_geometries([pc])
+
         self.calibration_thread.join()
         exit(f"restart the program to use the calibrated values")
 
@@ -659,20 +640,37 @@ class UR5Env(gym.Env):
         except Exception as e:
             print(f"Failed to close cameras: {e}")
 
-    def send_pos_command(self, target_pose: np.ndarray):
+    def _send_pos_command(self, target_pos: np.ndarray):
         """Internal function to send force command to the robot."""
-        self.controller.set_target_pose(target_pose=target_pose)
+        self.controller.set_target_pos(target_pos=target_pos)
 
-    def send_gripper_command(self, gripper_pos: np.ndarray):
-        if self.neutral_gripper_command:
-            gripper_pos = np.array([0.0])
-            self.neutral_gripper_command = False
+    def _send_gripper_command(self, gripper_pos: np.ndarray):
         self.controller.set_gripper_pos(gripper_pos)
 
-    def send_reset_command(self, reset_Q: np.ndarray):
-        self.controller.set_reset_angles(reset_Q)
+    def _send_reset_command(self, reset_Q: np.ndarray):
+        self.controller.set_reset_Q(reset_Q)
 
-    def update_currpos(self):
+    def _send_taskspace_command(self, target_pos):
+        self.controller.set_reset_pose(target_pos)
+        
+    def _update_box_pos_estimate(self):
+        self.box_position = self.box_pose_est.get_box_position()
+        self.box_position = self.WF_rot @ self.box_position
+
+    def _update_box_orientation_estimate(self):
+        self.box_orientation = self.box_pose_est.get_box_orientation()
+        self.box_orientation = (R.from_matrix(self.rotation_generalization) * R.from_matrix(self.WF_rot) * R.from_rotvec(self.box_orientation)).as_rotvec()
+        
+    def _update_box_size_estimate(self):
+        self.box_size = self.box_pose_est.get_box_size()
+        
+    def _get_goal_pose(self):
+        """
+        Make sure the goal pose is the correct one before computing the reward.
+        """
+        self.goal_pose = self.config.GOAL_POSE
+
+    def _update_currpos(self):
         """
         Internal function to get the latest state of the robot and its gripper.
         """
@@ -680,35 +678,35 @@ class UR5Env(gym.Env):
 
         self.curr_pos[:] = state['pos']
         self.curr_vel[:] = state['vel']
-        self.curr_force[:] = state['force'][:3]
-        self.curr_torque[:] = state['force'][3:]
+        self.curr_force[:] = state['force']
+        self.curr_torque[:] = state['torque']
         self.curr_Q[:] = state['Q']
         self.curr_Qd[:] = state['Qd']
         self.gripper_state[:] = state['gripper']
-        self.curr_timestamp = state['timestamp_ms']
 
     def _is_truncated(self):
         return self.controller.is_truncated()
 
-    def _get_obs(self, action) -> dict:
+    def _get_obs(self, action) -> dict:     ## Overwritten by box_placing_env.py
         # get image before state observation, so they match better in time
 
-        self.update_currpos()
         images = None
         if self.camera_mode is not None:
-            images, timestamp = self.get_image()
-
-        self.curr_timestamp_diff[:] = (self.curr_timestamp - self.last_state_timestamp) * 1e-3 if self.last_state_timestamp else 0.
-        self.last_state_timestamp = self.curr_timestamp
-
+            images = self.get_image()
+            
+        if self.pose_est:
+            self._update_box_pos_estimate()
+        else:
+            self.box_position = np.array([0.5, 0.5, 0.5])
+        
+        self._update_currpos()
         state_observation = {
             "tcp_pose": self.curr_pos,
             "tcp_vel": self.curr_vel,
             "gripper_state": self.gripper_state,
             "tcp_force": self.curr_force,
             "tcp_torque": self.curr_torque,
-            "action": action,
-            "time_diff": self.curr_timestamp_diff
+            "action": action
         }
 
         if images is not None:
@@ -719,4 +717,6 @@ class UR5Env(gym.Env):
     def close(self):
         if self.controller:
             self.controller.stop()
+        if self.pose_est:
+            self.box_pose_est.stop()
         super().close()

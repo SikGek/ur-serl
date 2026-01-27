@@ -10,7 +10,7 @@ class SERLObsWrapper(gym.ObservationWrapper):
     of a flattened state space and the images.
     """
 
-    def __init__(self, env, print_info=False):
+    def __init__(self, env):
         super().__init__(env)
         self.observation_space = gym.spaces.Dict(
             {
@@ -18,13 +18,6 @@ class SERLObsWrapper(gym.ObservationWrapper):
                 **(self.env.observation_space["images"] if "images" in self.env.observation_space.spaces else {}),
             }
         )
-        i, infos = 0, {}
-        for key, val in self.env.observation_space["state"].items():
-            infos[key] = (i, i+val.shape[0])
-            i += val.shape[0]
-        
-        if print_info:
-            print(f"SERLObsWrapper: {infos}")
 
     def observation(self, obs):
         obs = {
@@ -48,6 +41,23 @@ class SerlObsWrapperNoImages(gym.ObservationWrapper):
         obs = flatten(self.env.observation_space["state"], obs["state"])
         return obs
 
+class SerlObsWrapperTrajBox(gym.ObservationWrapper):
+    """
+    This observation wrapper treats the observation space as a flattened
+    space, if no images are present.
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+        # Create a flattened space that includes all observation components
+        
+        self.observation_space = flatten_space(self.env.observation_space["state"])
+
+    def observation(self, obs):
+        # Flatten state component
+        obs = flatten(self.env.observation_space["state"], obs["state"])
+        return obs
+
 
 class ScaleObservationWrapper(gym.ObservationWrapper):
     """
@@ -57,10 +67,10 @@ class ScaleObservationWrapper(gym.ObservationWrapper):
 
     def __init__(self,
                  env,
-                 translation_scale=1.,
-                 rotation_scale=0.1,
-                 force_scale=0.001,
-                 torque_scale=0.01
+                 translation_scale=100.,
+                 rotation_scale=10.,
+                 force_scale=1.,
+                 torque_scale=10.
                  ):
         super().__init__(env)
         self.translation_scale = translation_scale
@@ -83,4 +93,11 @@ class ScaleObservationWrapper(gym.ObservationWrapper):
         obs["state"]["tcp_vel"][3:] *= self.rotation_scale
         obs["state"]["tcp_force"] *= self.force_scale
         obs["state"]["tcp_torque"] *= self.torque_scale
+        obs["state"]["boxes"][:3] *= self.translation_scale
+        obs["state"]["boxes"][3:] *= self.rotation_scale
+        obs["state"]["trajectory"][:3] *= self.translation_scale
+        obs["state"]["trajectory"][3:] *= self.rotation_scale
+        obs["state"]["goal_pose"][:3] *= self.translation_scale
+        obs["state"]["goal_pose"][3:] *= self.rotation_scale
+        
         return obs

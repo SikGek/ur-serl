@@ -10,7 +10,8 @@ from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 
 from ur_env.utils.vacuum_gripper import VacuumGripper
-from ur_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose_2_rotvec, pose_2_quat
+from ur_env.utils.robotiq2f_85 import Robotiq2F85Gripper
+from ur_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2rotvec, pose2quat
 
 np.set_printoptions(precision=4, suppress=True)
 
@@ -74,7 +75,8 @@ class UrImpedanceController(threading.Thread):
 
         self.ur_control: RTDEControlInterface = None
         self.ur_receive: RTDEReceiveInterface = None
-        self.robotiq_gripper: VacuumGripper = None
+        # self.robotiq_gripper: VacuumGripper = None
+        self.robotiq_gripper: Robotiq2F85Gripper = None
 
         # only temporary to test
         self.hist_data = [[], []]
@@ -101,7 +103,7 @@ class UrImpedanceController(threading.Thread):
         self.ur_control = RTDEControlInterface(self.robot_ip)
         self.ur_receive = RTDEReceiveInterface(self.robot_ip)
         if gripper:
-            self.robotiq_gripper = VacuumGripper(self.robot_ip)
+            self.robotiq_gripper = Robotiq2F85Gripper(self.robot_ip)
             await self.robotiq_gripper.connect()
             await self.robotiq_gripper.activate()
         if self.verbose:
@@ -174,29 +176,31 @@ class UrImpedanceController(threading.Thread):
                 return self.target_pos
 
     async def _update_robot_state(self):
+        gs = await self.robotiq_gripper.get_state()
         pos = self.ur_receive.getActualTCPPose()
         vel = self.ur_receive.getActualTCPSpeed()
         Q = self.ur_receive.getActualQ()
         Qd = self.ur_receive.getActualQd()
         force = self.ur_receive.getActualTCPForce()
-        pressure = await self.robotiq_gripper.get_current_pressure()
-        obj_status = await self.robotiq_gripper.get_object_status()
+        pressure = gs.pos_norm
+        obj_status = 1.0 if gs.object_detected else 0.0
 
         # 3-> no object detected, 0-> sucking empty, [1, 2] obj detected
-        grip_status = [-1., 1., 1., 0.][obj_status.value]
+        # grip_status = [-1., 1., 1., 0.][obj_status.value]
+        grip_status = obj_status
 
         pressure = pressure if pressure < 99 else 0     # 100 no obj, 99 sucking empty, so they are ignored
         # grip status, 0->neutral, -1->bad (sucking but no obj), 1-> good (sucking and obj)
-        grip_status = 1. if pressure > 0 else grip_status
-        pressure /= 98.  # pressure between [0, 1]
+        # grip_status = 1. if pressure > 0 else grip_status
+        # pressure /= 98.  # pressure between [0, 1]
         with self.lock:
-            self.curr_pos[:] = pose_2_quat(pos)
+            self.curr_pos[:] = pose2quat(pos)
             self.curr_vel[:] = vel
             self.curr_Q[:] = Q
             self.curr_Qd[:] = Qd
             self.curr_force[:] = np.array(force)
             # use moving average (5), since the force fluctuates heavily
-            self.curr_force_lowpass[:] = 0.1 * np.array(force) + 0.9 * self.curr_force_lowpass[:]
+            self.curr_force_lowpass[:] = 0.9 * np.array(force) + 0.1 * self.curr_force_lowpass[:]
             self.gripper_state[:] = [pressure, grip_status]
 
     def get_state(self):
@@ -238,6 +242,7 @@ class UrImpedanceController(threading.Thread):
 
         # check for big downward tcp force and adapt accordingly
         if self.curr_force[2] > 3.5 and force_pos[2] < 0.:
+            # pass
             force_pos[2] = max((1.5 - self.curr_force_lowpass[2]), 0.) * force_pos[2] + min(self.curr_force_lowpass[2] - 0.5, 1.) * 20.
 
         return np.concatenate((force_pos, torque))
@@ -252,8 +257,8 @@ class UrImpedanceController(threading.Thread):
         self.ur_control.forceModeStop()
 
         print("[RIC] plotting")
-        real_pos = np.array([pose_2_rotvec(q) for q in self.hist_data[0]])
-        target_pos = np.array([pose_2_rotvec(q) for q in self.hist_data[1]])
+        real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
+        target_pos = np.array([pose2rotvec(q) for q in self.hist_data[1]])
 
         plt.figure()
         fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 8), dpi=200)
@@ -273,27 +278,29 @@ class UrImpedanceController(threading.Thread):
 
     async def send_gripper_command(self, force_release=False):
         if force_release:
-            await self.robotiq_gripper.automatic_release()
+            await self.robotiq_gripper.open(wait=False)
             self.target_grip[0] = 0.0
             return
 
         timeout_exceeded = (time.monotonic() - self.gripper_timeout["last_grip"]) * 1000 > self.gripper_timeout[
             "timeout"]
         # target grip above threshold and timeout exceeded and not gripping something already
-        if self.target_grip[0] > 0.5 and timeout_exceeded and self.gripper_state[1] < 0.5:
-            await self.robotiq_gripper.automatic_grip()
+        if self.target_grip[0] > 0.5 and timeout_exceeded:
+            await self.robotiq_gripper.close(wait=False)
             self.target_grip[0] = 0.0
             self.gripper_timeout["last_grip"] = time.monotonic()
             # print("grip")
 
         # release if below neg threshold and gripper activated (grip_status not zero)
-        elif self.target_grip[0] < -0.5 and abs(self.gripper_state[1]) > 0.5:
-            await self.robotiq_gripper.automatic_release()
+        elif self.target_grip[0] < -0.5:
+            await self.robotiq_gripper.open(wait=False)
             self.target_grip[0] = 0.0
             # print("release")
+        # elif self.target_grip[0] < -0.5:
+        #     print("gripper not activated, but release requested")
 
     def _truncate_check(self):
-        downward_force = self.curr_force_lowpass[2] > 20.
+        downward_force = self.curr_force_lowpass[2] > 30.
         if downward_force:  # TODO add better criteria
             self._is_truncated.set()
         else:
@@ -420,7 +427,7 @@ class UrImpedanceController(threading.Thread):
 
             # move to real home
             pi = 3.1415
-            reset_Q = [0, -pi / 2., pi / 2., -pi / 2., -pi / 2., 0.]
+            reset_Q = np.deg2rad([-28.84, -80.1, 110.96, -120.75, -89.77, -28.93])
             self.ur_control.moveJ(reset_Q, speed=1., acceleration=0.8)
 
             # terminate

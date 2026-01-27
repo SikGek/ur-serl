@@ -1,7 +1,6 @@
 from typing import Optional
 
 import optax
-import jax
 
 
 def make_optimizer(

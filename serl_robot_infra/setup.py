@@ -5,7 +5,7 @@ setup(
     version="0.0.1",
     packages=find_packages(),
     install_requires=[
-        "gym>=0.26",
+        "gymnasium",
         "pyrealsense2",
         "pymodbus==2.5.3",
         "opencv-python",
@@ -16,8 +16,8 @@ setup(
         "rospkg",
         "scipy",
         "requests",
+        "responses",
         "flask",
         "defusedxml",
-        "pynput",
     ],
 )

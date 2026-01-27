@@ -49,9 +49,8 @@ class FWBWFrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, rew, done, truncated, info = self.env.step(action)
-        success = self.compute_reward(self.env.get_front_cam_obs())
-        rew += success
-        done = done or success
+        rew = self.compute_reward(self.env.get_front_cam_obs())
+        done = done or rew
         return obs, rew, done, truncated, info
 
 
@@ -73,9 +72,8 @@ class FrontCameraBinaryRewardClassifierWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, rew, done, truncated, info = self.env.step(action)
-        success = self.compute_reward(self.env.get_front_cam_obs())
-        rew += success
-        done = done or success
+        rew = self.compute_reward(self.env.get_front_cam_obs())
+        done = done or rew
         return obs, rew, done, truncated, info
 
 
@@ -96,9 +94,8 @@ class BinaryRewardClassifierWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, rew, done, truncated, info = self.env.step(action)
-        success = self.compute_reward(obs)
-        rew += success
-        done = done or success
+        rew = self.compute_reward(obs)
+        done = done or rew
         return obs, rew, done, truncated, info
 
 

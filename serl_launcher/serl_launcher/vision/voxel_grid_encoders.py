@@ -96,8 +96,6 @@ class VoxNet(nn.Module):
     final_activation: Callable[[jnp.ndarray], jnp.ndarray] | str = nn.tanh
     pretrained: bool = False
     scale_factor: float = 1.
-    use_color: bool = False         # for color voxels
-    fix_pretrained_gradient: bool = False  # whether to stop gradients for pretrained layers
 
     @nn.compact
     def __call__(
@@ -107,17 +105,11 @@ class VoxNet(nn.Module):
             train: bool = True,
     ):
         # observations has shape (B, X, Y, Z) (boolean for now)
-        # with color --> (B, X, Y, Z, (O + C))  occupancy + color
-
-        no_batch_dim = len(observations.shape) < 4 + int(self.use_color)
+        no_batch_dim = len(observations.shape) < 4
         if no_batch_dim:
             observations = observations[None]
 
         observations = observations.astype(jnp.float32)[..., None] / self.scale_factor  # add conv channel
-        if self.use_color:
-            observations = observations / 255.
-            observations = observations[..., 0]
-            # observations = jnp.reshape(observations, (1, 50, 50, 40, 4))
 
         conv3d = partial(nn.Conv, kernel_init=nn.initializers.xavier_normal(), use_bias=self.use_conv_bias,
                          padding="valid", bias_init=nn.zeros_init())
@@ -134,7 +126,7 @@ class VoxNet(nn.Module):
             features=feature_dimensions[0],
             kernel_size=(5, 5, 5),
             strides=(2, 2, 2),
-            name=f"{'frozen_' if self.pretrained else ''}conv_5x5x5",
+            name="conv_5x5x5",
         )(x)
         x = nn.LayerNorm()(x)
         x = l_relu(x)  # shape (B, (X-3)/2, (Y-3)/2, (Z-3)/2, F)
@@ -143,15 +135,15 @@ class VoxNet(nn.Module):
             features=feature_dimensions[1],
             kernel_size=(3, 3, 3),
             strides=(1, 1, 1),
-            name=f"{'frozen_' if self.pretrained else ''}conv_3x3x3"
+            name="conv_3x3x3"
         )(x)
         x = max_pool(x)
 
+        if self.pretrained:
+            x = jax.lax.stop_gradient(x)  # unfortunately also cuts gradients of the LayerNorm above
+
         x = nn.LayerNorm()(x)
         x = l_relu(x)  # shape (B, (X-4)/2, (Y-4)/2, (Z-4)/2, F)
-
-        if self.fix_pretrained_gradient:
-            x = jax.lax.stop_gradient(x)
 
         x = conv3d(
             features=feature_dimensions[2],            # if pretrained, only uses [..] out of 128 pretrained params as initial weights
@@ -164,11 +156,12 @@ class VoxNet(nn.Module):
 
         # x = SpatialSoftArgmax3D(10, 10, 8, 64)(x)
         # jax.debug.print("ssam {}", x)
+
         # reshape and dense (preserve batch dim)
         x = jnp.reshape(x, (1 if no_batch_dim else x.shape[0], -1))
         if self.bottleneck_dim is not None:
             x = nn.Dense(self.bottleneck_dim)(x)
-            x = self.final_activation(x)
             x = nn.LayerNorm()(x)
+            x = self.final_activation(x)
 
         return x[0] if no_batch_dim else x

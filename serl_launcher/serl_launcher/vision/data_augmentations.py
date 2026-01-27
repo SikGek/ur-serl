@@ -149,32 +149,18 @@ def batched_random_crop(img, rng, *, padding, num_batch_dims: int = 1):
     img = jnp.reshape(img, original_shape)
     return img
 
+
 def random_shift_3d(img, rng, *, padding):
-    crop_from = jax.random.randint(rng, (img.ndim,), 0, 2 * padding + 1)
-    if img.ndim == 3:       # (x, y, z) boolean
-        padded_img = jnp.pad(
-            img,
-            (
-                (padding, padding),
-                (padding, padding),
-                (padding, padding),
-            ),
-            mode="constant"
-        )
-    elif img.ndim == 4:     # (x y, z, c) color
-        crop_from = crop_from.at[-1].set(0)  # no shift in color dim0
-        padded_img = jnp.pad(
-            img,
-            (
-                (padding, padding),
-                (padding, padding),
-                (padding, padding),
-                (0, 0),
-            ),
-            mode="constant"
-        )
-    else:
-        raise ValueError("Input must be either 3D or 4D.")
+    crop_from = jax.random.randint(rng, (3,), 0, 2 * padding + 1)
+    padded_img = jnp.pad(
+        img,
+        (
+            (padding, padding),
+            (padding, padding),
+            (padding, padding),
+        ),
+        mode="constant"
+    )
     return jax.lax.dynamic_slice(padded_img, crop_from, img.shape)
 
 
@@ -183,7 +169,6 @@ def batched_random_shift_voxel(img, rng, *, padding, num_batch_dims: int = 1):
     original_shape = img.shape
     img = jnp.reshape(img, (-1, *img.shape[num_batch_dims:]))
     # shape (B, B2, X, Y, Z)
-    # or shape (B, B2, X, Y, Z, C)
 
     rngs = jax.random.split(rng, img.shape[0])
     img = jax.vmap(
@@ -193,83 +178,6 @@ def batched_random_shift_voxel(img, rng, *, padding, num_batch_dims: int = 1):
     # Restore batch dims
     img = jnp.reshape(img, original_shape)
     return img
-
-
-
-
-def build_std_vec_from_slices(total_dim, assignments, default_std=0.0):
-    """
-    Build a per-dimension std vector from a dict of slice/index assignments.
-
-    assignments: dict where keys are one of:
-      - slice objects (e.g., slice(0, 3))
-      - (start, end) tuples interpreted as [start, end)
-      - int index or a list/tuple of ints
-    Values are floats (std for those positions).
-    """
-    vec = jnp.full((total_dim,), float(default_std), dtype=jnp.float32)
-
-    def to_indices(key):
-        if isinstance(key, slice):
-            # Convert slice to indices
-            start = 0 if key.start is None else key.start
-            stop = total_dim if key.stop is None else key.stop
-            step = 1 if key.step is None else key.step
-            return jnp.arange(start, stop, step)
-        if isinstance(key, tuple) and len(key) == 2 and all(isinstance(k, int) for k in key):
-            start, stop = key
-            return jnp.arange(start, stop)
-        if isinstance(key, int):
-            return jnp.array([key])
-        if isinstance(key, (list, tuple)) and all(isinstance(k, int) for k in key):
-            return jnp.array(list(key))
-        raise ValueError(f"Unsupported assignment key type: {type(key)}")
-
-    # Python loop is fine (not jitted). Each update uses .at[].set which is JAX-friendly.
-    for key, std in assignments.items():
-        idx = to_indices(key)
-        vec = vec.at[idx].set(float(std))
-
-    return vec
-
-
-@partial(jax.jit, static_argnames=("num_batch_dims",))
-def add_gaussian_noise_state(state, rng, std_vec, apply_prob=1.0, *, num_batch_dims: int = 1):
-    """
-    Adds Gaussian noise to state with per-dimension std_vec.
-
-    - state: array with leading batch dims, last dim are features.
-    - std_vec: shape (features,) or broadcastable to the last dim.
-    - apply_prob: probability to apply noise per element over the flattened batch.
-    - num_batch_dims: number of leading batch dims to preserve.
-    """
-    original_shape = state.shape
-    flat = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
-    features = flat.shape[-1]
-
-    std_vec = jnp.asarray(std_vec, dtype=jnp.float32)
-    std_vec = jnp.broadcast_to(std_vec, (features,))
-    std_b = std_vec[jnp.newaxis, ...]
-
-    noise_rng, mask_rng = jax.random.split(rng)
-    noise = jax.random.normal(noise_rng, flat.shape) * std_b
-
-    def apply_with_mask(args):
-        flat, noise, mask_rng, prob = args
-        mask = jax.random.uniform(mask_rng, (flat.shape[0],)) <= prob
-        mask = mask[:, jnp.newaxis]
-        return jnp.where(mask, flat + noise, flat)
-
-    def apply_all(args):
-        flat, noise, mask_rng, prob = args
-        return flat + noise
-
-    prob = jnp.asarray(apply_prob, dtype=flat.dtype)
-    flat_noisy = jax.lax.cond(prob < 1.0,
-                              (flat, noise, mask_rng, prob), apply_with_mask,
-                              (flat, noise, mask_rng, prob), apply_all)
-
-    return jnp.reshape(flat_noisy, original_shape)
 
 
 def _maybe_apply(apply_fn, inputs, rng, apply_prob):

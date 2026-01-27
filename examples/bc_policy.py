@@ -9,7 +9,7 @@ from copy import deepcopy
 import time
 
 import gymnasium as gym
-from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+from gymnasium.wrappers import RecordEpisodeStatistics
 
 from serl_launcher.utils.timer_utils import Timer
 from serl_launcher.wrappers.chunking import ChunkingWrapper
@@ -140,6 +140,13 @@ def main(_):
         Training Mode
         """
         sampling_rng = jax.device_put(sampling_rng, device=sharding.replicate())
+        # load demos
+        replay_buffer = MemoryEfficientReplayBufferDataStore(
+            env.observation_space,
+            env.action_space,
+            FLAGS.replay_buffer_capacity,
+            image_keys=image_keys,
+        )
         # load demos and populate to current replay buffer
         replay_buffer = MemoryEfficientReplayBufferDataStore(
             env.observation_space,

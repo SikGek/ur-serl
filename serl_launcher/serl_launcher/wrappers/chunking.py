@@ -2,6 +2,7 @@ from collections import deque
 from typing import Optional
 
 import gymnasium as gym
+import gymnasium.spaces
 import jax
 import numpy as np
 
@@ -22,8 +23,8 @@ def space_stack(space: gym.Space, repeat: int):
         )
     elif isinstance(space, gym.spaces.Discrete):
         return gym.spaces.MultiDiscrete([space.n] * repeat)
-    elif isinstance(space, gym.spaces.dict.Dict):
-        return gym.spaces.dict.Dict(
+    elif isinstance(space, gym.spaces.Dict):
+        return gym.spaces.Dict(
             {k: space_stack(v, repeat) for k, v in space.spaces.items()}
         )
     else:
@@ -71,6 +72,6 @@ class ChunkingWrapper(gym.Wrapper):
         return (stack_obs(self.current_obs), reward, done, trunc, info)
 
     def reset(self, **kwargs):
-        obs, info = self.env.reset(**kwargs)
+        obs, info = self.env.reset()
         self.current_obs.extend([obs] * self.obs_horizon)
         return stack_obs(self.current_obs), info

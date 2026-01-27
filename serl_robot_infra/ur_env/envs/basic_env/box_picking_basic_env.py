@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from ur_env.envs.ur5_env import UR5Env
-from ur_env.envs.basic_env.config import UR5CornerConfig
+from ur_env.envs.basic_env.config import UR5PickingConfig
 
 
 # used for float value comparisons (pressure of vacuum-gripper)
@@ -12,7 +12,7 @@ def is_close(value, target):
 
 class BoxPickingBasicEnv(UR5Env):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, config=UR5CornerConfig)
+        super().__init__(**kwargs, config=UR5PickingConfig)
 
     def compute_reward(self, obs, action) -> float:
         # huge action gives negative reward (like in mountain car)
@@ -23,6 +23,8 @@ class BoxPickingBasicEnv(UR5Env):
         suck_cost = 0.1 * float(is_close(gripper_state[0], 0.99))
 
         pose = obs["state"]["tcp_pose"]
+        # box_xy = np.array([0.009, -0.5437])     # TODO replace with camera / pointcloud info of box
+        # xy_cost = 5 * np.sum(np.power(pose[:2] - box_xy, 2))        # TODO can be ignored
 
         # print(f"action_cost: {action_cost}, xy_cost: {xy_cost}")
         if self.reached_goal_state(obs):
@@ -33,4 +35,4 @@ class BoxPickingBasicEnv(UR5Env):
     def reached_goal_state(self, obs) -> bool:
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
         state = obs["state"]
-        return 0.1 < state['gripper_state'][0] < 0.85 and state['tcp_pose'][2] > 0.15  # new min height with box
+        return 0.1 < state['gripper_state'][1] < 0.5 and state['tcp_pose'][2] > 0.25  # new min height with box
