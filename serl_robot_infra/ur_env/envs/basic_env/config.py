@@ -5,8 +5,11 @@ import numpy as np
 class UR5PickingConfig(DefaultEnvConfig):
     # RESET_Q = np.array([[1.34231, -1.24585, 1.94961, -2.27267, -1.56428, -0.22641]])   # original one
     # RESET_Q = np.array([[1.3463, -1.3584,  1.9014, -2.1243, -1.5758, -0.2312]])
+    # RESET_Q = np.array([
+    #     [-36.26, -82.24, 128.58, -136.35, -89.82, -46.5],
+    # ])
     RESET_Q = np.array([
-        [-36.26, -82.24, 128.58, -136.35, -89.82, -46.5],
+        [272.0, -82.24, -105.75, -90.70, 90.27, 171.14],
     ])
     RESET_Q = np.deg2rad(RESET_Q)
     RANDOM_RESET = False
@@ -18,7 +21,7 @@ class UR5PickingConfig(DefaultEnvConfig):
     ABS_POSE_LIMIT_LOW = np.array([-0.6, 0., -0.1, -0.05, -0.05, -0.2])
     ACTION_SCALE = np.array([0.02, 0.1, 1.], dtype=np.float32)
 
-    ROBOT_IP: str = "192.168.1.66"
+    ROBOT_IP: str = "192.168.56.2"
     CONTROLLER_HZ = 100
     GRIPPER_TIMEOUT = 2000  # in milliseconds
     ERROR_DELTA: float = 0.05

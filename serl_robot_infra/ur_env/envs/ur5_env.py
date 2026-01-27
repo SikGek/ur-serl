@@ -430,7 +430,7 @@ class UR5Env(gym.Env):
             if i == 0:
                 raise Exception("err")
             try:
-                r = requests.get('http://192.168.1.204:5000/api/data')
+                r = requests.get('http://192.168.56.2:5000/api/data')
                 r.raise_for_status()
                 boxes = r.json()
                 if len(boxes) == 0:
