@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Optional
 
-from gripper import Gripper  # Davinci-Kitchen-GmbH/ur-robotiq-gripper
+from ur_env.utils.gripper import Gripper  # Davinci-Kitchen-GmbH/ur-robotiq-gripper
 
 @dataclass
 class Robotiq2F85State:
