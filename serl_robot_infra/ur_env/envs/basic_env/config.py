@@ -29,6 +29,9 @@ class UR5PickingConfig(DefaultEnvConfig):
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
+    GRIPPER_USB_PORT = "/dev/ttyUSB0"
+    GRIPPER_SLAVE_ID = 9
+
 
 
 # class UR5CornerConfigV1(DefaultEnvConfig):

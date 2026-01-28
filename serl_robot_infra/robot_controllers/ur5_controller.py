@@ -9,9 +9,11 @@ from scipy.spatial.transform import Rotation as R
 from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 
+from ur_env.envs.basic_env import config
 from ur_env.utils.vacuum_gripper import VacuumGripper
-from ur_env.utils.robotiq2f_85 import Robotiq2F85Gripper
+# from ur_env.utils.robotiq2f_85 import Robotiq2F85Gripper
 from ur_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2rotvec, pose2quat
+from ur_env.utils.robotiq_usb import Robotiq2F85USBGripper as Robotiq2F85Gripper
 
 np.set_printoptions(precision=4, suppress=True)
 
@@ -103,9 +105,13 @@ class UrImpedanceController(threading.Thread):
         self.ur_control = RTDEControlInterface(self.robot_ip)
         self.ur_receive = RTDEReceiveInterface(self.robot_ip)
         if gripper:
-            self.robotiq_gripper = Robotiq2F85Gripper(self.robot_ip)
-            await self.robotiq_gripper.connect()
-            await self.robotiq_gripper.activate()
+            # self.robotiq_gripper = Robotiq2F85Gripper(self.robot_ip)
+            # await self.robotiq_gripper.connect()
+            # await self.robotiq_gripper.activate()
+            self.robotiq_gripper = Robotiq2F85Gripper(
+            port=config.GRIPPER_USB_PORT,   # e.g. "/dev/ttyUSB0"
+            slave_id=getattr(config, "GRIPPER_SLAVE_ID", 9),
+            )   
         if self.verbose:
             gr_string = "(with gripper) " if gripper else ""
             print(f"[RIC] Controller connected to robot {gr_string}at: {self.robot_ip}")
@@ -182,14 +188,17 @@ class UrImpedanceController(threading.Thread):
         Q = self.ur_receive.getActualQ()
         Qd = self.ur_receive.getActualQd()
         force = self.ur_receive.getActualTCPForce()
-        pressure = gs.pos_norm
-        obj_status = 1.0 if gs.object_detected else 0.0
+        # pressure = gs.pos_norm
+        # obj_status = 1.0 if gs.object_detected else 0.0
+        pos = await self.robotiq_gripper.get_position_byte()   # 0..255
+        obj = await self.robotiq_gripper.get_object_status()
 
         # 3-> no object detected, 0-> sucking empty, [1, 2] obj detected
         # grip_status = [-1., 1., 1., 0.][obj_status.value]
-        grip_status = obj_status
-
-        pressure = pressure if pressure < 99 else 0     # 100 no obj, 99 sucking empty, so they are ignored
+        # grip_status = obj_status
+        closed_norm = pos / 255.0  # 0=open, 1=closed
+        object_detected = 1.0 if obj.value in (1, 2) else 0.0
+        # pressure = pressure if pressure < 99 else 0     # 100 no obj, 99 sucking empty, so they are ignored
         # grip status, 0->neutral, -1->bad (sucking but no obj), 1-> good (sucking and obj)
         # grip_status = 1. if pressure > 0 else grip_status
         # pressure /= 98.  # pressure between [0, 1]
@@ -201,7 +210,7 @@ class UrImpedanceController(threading.Thread):
             self.curr_force[:] = np.array(force)
             # use moving average (5), since the force fluctuates heavily
             self.curr_force_lowpass[:] = 0.9 * np.array(force) + 0.1 * self.curr_force_lowpass[:]
-            self.gripper_state[:] = [pressure, grip_status]
+            self.gripper_state[:] = [closed_norm, object_detected]
 
     def get_state(self):
         with self.lock:
