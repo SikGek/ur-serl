@@ -32,8 +32,8 @@ def on_esc(key):
 
 
 if __name__ == "__main__":
-    env = gym.make("box_picking_camera_env",
-                   camera_mode="pointcloud",
+    env = gym.make("box_picking_basic_env",
+                   camera_mode="none",
                    max_episode_length=100,
                    )
     env = SpacemouseIntervention(env)
