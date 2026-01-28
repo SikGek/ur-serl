@@ -20,7 +20,7 @@ from ur_env.camera.video_capture import VideoCapture
 from ur_env.camera.rs_capture import RSCapture
 
 from ur_env.camera.utils import PointCloudFusion, CalibrationTread
-# from ur_env.utils.pose_estimation import BoxPoseEstimation
+from ur_env.utils.pose_estimation import BoxPoseEstimation
 
 from robot_controllers.ur5_controller import UrImpedanceController
 
@@ -137,14 +137,17 @@ class UR5Env(gym.Env):
         
         self.pose_estimation_ip = config.POSE_ESTIMATION_IP
         self.pose_est = config.POSE_ESTIMATION
+        # self.pose_estimation_ip = None
+        # self. pose_est = None
         self.WF_rot = config.WF_rot
+        # self.WF_rot = None
         self.residual_learning_inference = True
         self.box_error = config.BOX_ERROR
         self.low_pass_filter_k = config.LOW_PASS_FILTER
         
         # boxes
-        # self.box_pose_est = BoxPoseEstimation(self.pose_estimation_ip) if config.POSE_ESTIMATION else None
-        self.box_pose_est = None
+        self.box_pose_est = BoxPoseEstimation(self.pose_estimation_ip) if config.POSE_ESTIMATION else None
+        # self.box_pose_est = None
         self.goal_pose = np.zeros((3,), dtype=np.float32)
         self.box_position = np.zeros((3,), dtype=np.float32)
         self.box_orientation = np.zeros((3,), dtype=np.float32)

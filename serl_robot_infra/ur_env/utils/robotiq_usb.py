@@ -51,7 +51,7 @@ class Robotiq2F85USBGripper:
         self.slave_id = int(slave_id)
 
         self.client = ModbusSerialClient(
-            method="rtu",
+            framer="rtu",
             port=self.port,
             baudrate=int(baudrate),
             bytesize=8,
@@ -109,10 +109,10 @@ class Robotiq2F85USBGripper:
 
     def _read_holding_sync(self, address: int, count: int):
         # pymodbus 2.x uses unit= ; pymodbus 3 uses slave=
-        try:
-            rr = self.client.read_holding_registers(address, count, slave=self.slave_id)
-        except TypeError:
-            rr = self.client.read_holding_registers(address, count, unit=self.slave_id)
+        # try:
+            # rr = self.client.read_holding_registers(address, count, slave=self.slave_id)
+        # except TypeError:
+        rr = self.client.read_holding_registers(address=address, count=count)
 
         if rr is None or getattr(rr, "isError", lambda: True)():
             raise RuntimeError(f"Modbus read failed (addr={address}, count={count}): {rr}")

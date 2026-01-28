@@ -90,7 +90,7 @@ class UrImpedanceController(threading.Thread):
         self.horizon = [0, 500]
         self.err = 0
         self.noerr = 0
-
+        self.config = config
         # log to file (reset every new run)
         with open("/tmp/console2.txt", 'w') as f:
             f.write("reset\n")
@@ -114,8 +114,8 @@ class UrImpedanceController(threading.Thread):
             # await self.robotiq_gripper.connect()
             # await self.robotiq_gripper.activate()
             self.robotiq_gripper = Robotiq2F85Gripper(
-            port=config.GRIPPER_USB_PORT,   # e.g. "/dev/ttyUSB0"
-            slave_id=getattr(config, "GRIPPER_SLAVE_ID", 9),
+            port=self.config.GRIPPER_USB_PORT,   # e.g. "/dev/ttyUSB0"
+            slave_id=getattr(self.config, "GRIPPER_SLAVE_ID", 9),
             )   
         if self.verbose:
             gr_string = "(with gripper) " if gripper else ""
@@ -187,7 +187,7 @@ class UrImpedanceController(threading.Thread):
                 return self.target_pos
 
     async def _update_robot_state(self):
-        gs = await self.robotiq_gripper.get_state()
+        gs = await self.robotiq_gripper.get_current_pressure()
         pos = self.ur_receive.getActualTCPPose()
         vel = self.ur_receive.getActualTCPSpeed()
         Q = self.ur_receive.getActualQ()
@@ -292,7 +292,7 @@ class UrImpedanceController(threading.Thread):
 
     async def send_gripper_command(self, force_release=False):
         if force_release:
-            await self.robotiq_gripper.open(wait=False)
+            await self.robotiq_gripper.automatic_release()
             self.target_grip[0] = 0.0
             return
 
@@ -300,14 +300,14 @@ class UrImpedanceController(threading.Thread):
             "timeout"]
         # target grip above threshold and timeout exceeded and not gripping something already
         if self.target_grip[0] > 0.5 and timeout_exceeded:
-            await self.robotiq_gripper.close(wait=False)
+            await self.robotiq_gripper.automatic_grip()
             self.target_grip[0] = 0.0
             self.gripper_timeout["last_grip"] = time.monotonic()
             # print("grip")
 
         # release if below neg threshold and gripper activated (grip_status not zero)
         elif self.target_grip[0] < -0.5:
-            await self.robotiq_gripper.open(wait=False)
+            await self.robotiq_gripper.automatic_release()
             self.target_grip[0] = 0.0
             # print("release")
         # elif self.target_grip[0] < -0.5:
