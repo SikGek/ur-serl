@@ -1,227 +1,303 @@
-import asyncio
-from enum import Enum
-from typing import Optional, Tuple
+from __future__ import annotations
 
-# --- pymodbus import that works across common versions ---
-try:
-    # pymodbus >= 3
-    from pymodbus.client import ModbusSerialClient
-except Exception:
-    try:
-        # some builds
-        from pymodbus.client.serial import ModbusSerialClient
-    except Exception:
-        # pymodbus 2.x
-        from pymodbus.client.sync import ModbusSerialClient
+import asyncio
+import time
+from enum import Enum
+from typing import Optional, Dict, Any
 
 
 class Robotiq2F85USBGripper:
     """
-    Robotiq 2F-85 / 2F-140 gripper control via USB (USB-RS485 adapter) using Modbus RTU.
+    Async wrapper around pyrobotiqgripper (Modbus RTU over serial) that matches the
+    method names used by your existing VacuumGripper.
 
-    This is a ROS-free replacement for the TCP/URCap style gripper interface.
+    IMPORTANT DESIGN CHOICE:
+      - We avoid pyrobotiqgripper.goTo() because it blocks until motion is finished.
+      - Instead, we send the same Modbus "write_registers(1000, [...])" command
+        (non-blocking) and separately poll readAll()/paramDic for state.
+
+    This makes it safe to call from a high-rate robot control loop.
     """
 
-    # Modbus register bases from the Robotiq manual:
-    # - Robot Output / Gripper Input first register: 0x03E8 (1000)
-    # - Robot Input / Gripper Output first register: 0x07D0 (2000)
-    OUT_REG0 = 0x03E8  # 1000
-    IN_REG0  = 0x07D0  # 2000
-
+    # Keep same enum names as your VacuumGripper so your controller code can reuse
     class GripperStatus(Enum):
         RESET = 0
         ACTIVATING = 1
         ACTIVE = 3
 
     class ObjectStatus(Enum):
-        # gOBJ meanings from manual:
         MOVING = 0
-        DETECTED_OPENING = 1
-        DETECTED_CLOSING = 2
-        AT_REQUESTED = 3
+        DETECTED_MIN = 1
+        DETECTED_MAX = 2
+        NO_OBJ_DETECTED = 3
 
     def __init__(
         self,
-        port: str,
-        slave_id: int = 9,
-        baudrate: int = 115200,
-        timeout_s: float = 0.05,
+        portname: str = "auto",
+        slaveaddress: int = 9,
+        default_speed: int = 255,
+        default_force: int = 150,
+        cache_period_s: float = 0.02,
+        emulate_vacuum_pressure: bool = True,
     ) -> None:
-        self.port = port
-        self.slave_id = int(slave_id)
+        """
+        Args:
+            portname: e.g. "/dev/ttyUSB0" or "COM4" or "auto"
+            slaveaddress: usually 9 for Robotiq 2F grippers
+            default_speed/default_force: [0..255]
+            cache_period_s: cache readAll results to avoid double reads per tick
+            emulate_vacuum_pressure:
+                - True: get_current_pressure() returns a *pseudo* "pressure" (0 or 98)
+                        so your existing vacuum-gripper logic doesn't instantly break.
+                - False: get_current_pressure() returns gPO (0..255) = actual gripper position.
+        """
+        self.portname = portname
+        self.slaveaddress = int(slaveaddress)
 
-        self.client = ModbusSerialClient(
-            framer="rtu",
-            port=self.port,
-            baudrate=int(baudrate),
-            bytesize=8,
-            parity="N",
-            stopbits=1,
-            timeout=float(timeout_s),
-        )
+        self.default_speed = int(default_speed)
+        self.default_force = int(default_force)
+        self.cache_period_s = float(cache_period_s)
+        self.emulate_vacuum_pressure = bool(emulate_vacuum_pressure)
 
-        # serialize read/write to avoid interleaving on the serial line
-        self.command_lock = asyncio.Lock()
+        self._gripper = None  # pyrobotiqgripper.RobotiqGripper instance
+        self._lock = asyncio.Lock()
 
-        self._connected = False
+        # cache of the last readAll()
+        self._cache_time = 0.0
+        self._cache: Optional[Dict[str, Any]] = None
 
-    # ----------------------------
-    # Low-level helpers
-    # ----------------------------
+        # track whether we’ve activated once
+        self._activated_once = False
+
+    # -------------------------
+    # Internal helpers
+    # -------------------------
     @staticmethod
-    def _regs_to_bytes(regs) -> Tuple[int, int, int, int, int, int]:
+    def _clamp_u8(x: int) -> int:
+        return max(0, min(int(x), 255))
+
+    async def _call_blocking(self, fn, *args, **kwargs):
         """
-        Convert 3x16-bit registers into 6 bytes.
-        We treat:
-          high byte = byte0, low byte = byte1
-        because that's how the Robotiq docs present "Byte 0, Byte 1, ..." per register.
+        Run blocking I/O (serial Modbus) off-thread.
         """
-        b = []
-        for r in regs:
-            b0 = (r >> 8) & 0xFF
-            b1 = r & 0xFF
-            b.extend([b0, b1])
-        return tuple(b[:6])
+        return await asyncio.to_thread(fn, *args, **kwargs)
 
-    @staticmethod
-    def _pack_regs(action_req: int, pos_req: int, speed: int, force: int,
-                  opt0: int = 0, opt1: int = 0) -> list:
+    def _require_connected(self):
+        if self._gripper is None:
+            raise RuntimeError("Robotiq gripper not connected. Call await connect() first.")
+
+    async def _read_all_cached(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
-        Build the 3 output registers (1000..1002) from the 6 bytes:
-          Byte0 action request
-          Byte1 options
-          Byte2 options/reserved
-          Byte3 position request (rPR)
-          Byte4 speed (rSP)
-          Byte5 force (rFR)
+        Calls gripper.readAll() (blocking) and returns a COPY of paramDic.
+        Uses a short cache window so get_current_pressure() and get_object_status()
+        in the same tick don't double-read the serial line.
         """
-        action_req = int(action_req) & 0xFF
-        pos_req = int(pos_req) & 0xFF
-        speed = int(speed) & 0xFF
-        force = int(force) & 0xFF
-        opt0 = int(opt0) & 0xFF
-        opt1 = int(opt1) & 0xFF
+        self._require_connected()
 
-        reg0 = (action_req << 8) | opt0
-        reg1 = (opt1 << 8) | pos_req
-        reg2 = (speed << 8) | force
-        return [reg0, reg1, reg2]
+        now = time.monotonic()
+        if (
+            (not force_refresh)
+            and (self._cache is not None)
+            and ((now - self._cache_time) < self.cache_period_s)
+        ):
+            return dict(self._cache)
 
-    def _read_holding_sync(self, address: int, count: int):
-        # pymodbus 2.x uses unit= ; pymodbus 3 uses slave=
-        # try:
-            # rr = self.client.read_holding_registers(address, count, slave=self.slave_id)
-        # except TypeError:
-        rr = self.client.read_holding_registers(address=address, count=count)
+        async with self._lock:
+            # re-check inside lock
+            now = time.monotonic()
+            if (
+                (not force_refresh)
+                and (self._cache is not None)
+                and ((now - self._cache_time) < self.cache_period_s)
+            ):
+                return dict(self._cache)
 
-        if rr is None or getattr(rr, "isError", lambda: True)():
-            raise RuntimeError(f"Modbus read failed (addr={address}, count={count}): {rr}")
-        return rr.registers
+            await self._call_blocking(self._gripper.readAll)
+            data = dict(getattr(self._gripper, "paramDic", {}))
+            self._cache = data
+            self._cache_time = now
+            return dict(data)
 
-    def _write_registers_sync(self, address: int, values: list):
-        try:
-            wr = self.client.write_registers(address, values, slave=self.slave_id)
-        except TypeError:
-            wr = self.client.write_registers(address, values, unit=self.slave_id)
+    async def _write_goto_nonblocking(self, position: int, speed: Optional[int] = None, force: Optional[int] = None):
+        """
+        Send a single Modbus 'go to' command WITHOUT waiting for motion completion.
 
-        if wr is None or getattr(wr, "isError", lambda: True)():
-            raise RuntimeError(f"Modbus write failed (addr={address}, values={values}): {wr}")
-        return True
+        This mirrors what pyrobotiqgripper.goTo() sends internally via:
+            write_registers(1000, [0b0000100100000000, position, speed*256 + force])
+        but skips the busy-wait loop.
+        """
+        self._require_connected()
 
-    async def _read_status_bytes(self) -> Tuple[int, int, int, int, int, int]:
-        async with self.command_lock:
-            regs = await asyncio.to_thread(self._read_holding_sync, self.IN_REG0, 3)
-        return self._regs_to_bytes(regs)
+        pos = self._clamp_u8(position)
+        spd = self._clamp_u8(self.default_speed if speed is None else speed)
+        frc = self._clamp_u8(self.default_force if force is None else force)
 
-    async def _write_command(self, action_req: int, pos_req: int, speed: int, force: int):
-        regs = self._pack_regs(action_req, pos_req, speed, force)
-        async with self.command_lock:
-            await asyncio.to_thread(self._write_registers_sync, self.OUT_REG0, regs)
+        reg0 = 0b0000100100000000  # rACT=1 and rGTO=1 encoded as in pyrobotiqgripper
+        reg1 = pos
+        reg2 = spd * 256 + frc
 
-    # ----------------------------
-    # Public API (matches your old style)
-    # ----------------------------
+        async with self._lock:
+            await self._call_blocking(self._gripper.write_registers, 1000, [reg0, reg1, reg2])
+
+        # Invalidate cache so next read sees fresh state
+        self._cache = None
+
+    async def _ensure_active(self):
+        if not await self.is_active():
+            await self.activate()
+
+    # -------------------------
+    # Public API (VacuumGripper-compatible)
+    # -------------------------
     async def connect(self) -> None:
-        ok = await asyncio.to_thread(self.client.connect)
-        if not ok:
-            raise RuntimeError(f"Failed to open Modbus RTU serial port: {self.port}")
-        self._connected = True
+        """
+        Create the underlying pyrobotiqgripper.RobotiqGripper instance.
+
+        pyrobotiqgripper constructor opens serial and performs an initial readAll().
+        """
+        # Import here so your program can still start even if gripper not needed
+        try:
+            from pyrobotiqgripper import RobotiqGripper
+        except Exception as e:
+            raise ImportError(
+                "pyrobotiqgripper is not installed or failed to import. "
+                "Install it with: pip install pyrobotiqgripper"
+            ) from e
+
+        async with self._lock:
+            # Create instrument (blocking)
+            self._gripper = await self._call_blocking(RobotiqGripper, self.portname, self.slaveaddress)
+            self._cache = None
+            self._activated_once = False
 
     async def disconnect(self) -> None:
-        if self._connected:
-            await asyncio.to_thread(self.client.close)
-        self._connected = False
+        """
+        Close the serial port if available.
+        """
+        if self._gripper is None:
+            return
+
+        async with self._lock:
+            ser = getattr(self._gripper, "serial", None)
+            try:
+                if ser is not None:
+                    await self._call_blocking(ser.close)
+            finally:
+                self._gripper = None
+                self._cache = None
+                self._activated_once = False
 
     async def activate(self) -> None:
         """
-        Activation sequence:
-          - clear activation (rACT=0)
-          - set activation (rACT=1)
-          - wait until gSTA==ACTIVE
+        Activates gripper (may take time: it can do motions during activation).
+        Only run when needed (startup / fault recovery), not every grip command.
         """
-        # rACT=0, rGTO=0 => action_req = 0x00
-        await self._write_command(action_req=0x00, pos_req=0x00, speed=0x00, force=0x00)
-        await asyncio.sleep(0.05)
-
-        # rACT=1, rGTO=0 => action_req = 0x01
-        await self._write_command(action_req=0x01, pos_req=0x00, speed=0x00, force=0x00)
-
-        # wait for gSTA==3 (ACTIVE)
-        for _ in range(200):
-            if await self.is_active():
-                return
-            await asyncio.sleep(0.01)
-        raise RuntimeError("Gripper activation timed out")
+        self._require_connected()
+        async with self._lock:
+            await self._call_blocking(self._gripper.activate)
+        self._activated_once = True
+        self._cache = None
 
     async def is_active(self) -> bool:
-        b0, _, _, _, _, _ = await self._read_status_bytes()
-        gSTA = (b0 >> 4) & 0x03
-        gACT = b0 & 0x01
-        return (gACT == 1) and (gSTA == self.GripperStatus.ACTIVE.value)
+        """
+        Returns True if gSTA indicates activation completed.
+        """
+        data = await self._read_all_cached(force_refresh=False)
+        gsta = int(data.get("gSTA", 0))
+        return gsta == int(self.GripperStatus.ACTIVE.value)
 
     async def get_fault_status(self) -> int:
-        _, _, b2, _, _, _ = await self._read_status_bytes()
-        return int(b2)
+        """
+        Return gFLT (0 means no fault).
+        """
+        data = await self._read_all_cached(force_refresh=False)
+        return int(data.get("gFLT", 0))
 
-    async def get_object_status(self) -> "Robotiq2F85USBGripper.ObjectStatus":
-        b0, _, _, _, _, _ = await self._read_status_bytes()
-        gOBJ = (b0 >> 6) & 0x03
-        return Robotiq2F85USBGripper.ObjectStatus(int(gOBJ))
+    async def get_object_status(self) -> ObjectStatus:
+        """
+        Map gOBJ -> VacuumGripper-like ObjectStatus enum.
+        """
+        data = await self._read_all_cached(force_refresh=False)
+        gobj = int(data.get("gOBJ", 0))
+        gobj = max(0, min(gobj, 3))
+        return self.ObjectStatus(gobj)
 
     async def get_current_pressure(self) -> int:
         """
-        Compatibility shim:
-        The 2F-85 doesn't have "pressure" like a vacuum gripper.
-        We return the *position byte* gPO (0..255), where:
-          0   ~ open
-          255 ~ closed
-        """
-        _, _, _, _, b4, _ = await self._read_status_bytes()
-        return int(b4)
+        VacuumGripper returns pressure; Robotiq doesn't have pressure.
 
-    # Convenience (explicit naming)
-    async def get_position_byte(self) -> int:
-        return await self.get_current_pressure()
-
-    async def automatic_grip(self) -> None:
+        Two modes:
+          - emulate_vacuum_pressure=True:
+              return 98 if object detected (gOBJ in {1,2}), else 0
+              (this is the closest drop-in for your current controller logic)
+          - emulate_vacuum_pressure=False:
+              return gPO (0..255) = actual gripper position from encoders
         """
-        Close fully:
-          rACT=1, rGTO=1 => action_req = 0x09
-          rPR=0xFF (full close), rSP=0xFF, rFR=0xFF
-        """
-        # Ensure active
-        if not await self.is_active():
-            await self.activate()
+        data = await self._read_all_cached(force_refresh=False)
 
-        await self._write_command(action_req=0x09, pos_req=0xFF, speed=0xFF, force=0xFF)
+        if not self.emulate_vacuum_pressure:
+            return int(data.get("gPO", 0))
 
-    async def automatic_release(self) -> None:
-        """
-        Open fully:
-          rACT=1, rGTO=1 => 0x09
-          rPR=0x00 (open), rSP=0xFF, rFR=0xFF
-        """
-        if not await self.is_active():
-            await self.activate()
+        gobj = int(data.get("gOBJ", 0))
+        if gobj in (1, 2):
+            return 98  # mimic "good suction pressure"
+        return 0
 
-        await self._write_command(action_req=0x09, pos_req=0x00, speed=0xFF, force=0xFF)
+    # ---- Commands (non-blocking) ----
+    async def automatic_grip(self) -> bool:
+        """
+        Close the gripper (non-blocking command).
+        Returns True if the command was sent (not whether object is grasped yet).
+        """
+        await self._ensure_active()
+        await self._write_goto_nonblocking(position=255)
+        return True
+
+    async def automatic_release(self) -> bool:
+        """
+        Open the gripper (non-blocking command).
+        """
+        await self._ensure_active()
+        await self._write_goto_nonblocking(position=0)
+        return True
+
+    async def advanced_grip(self, min_pressure: int, max_pressure: int, timeout: int) -> bool:
+        """
+        Vacuum's advanced_grip parameters don't map 1:1 to Robotiq.
+
+        We map:
+          - max_pressure -> force (0..255)
+          - timeout      -> speed (0..255)  (heuristic)
+        min_pressure is ignored (no direct analog).
+
+        Sends a non-blocking close command.
+        """
+        await self._ensure_active()
+        force = self._clamp_u8(max_pressure)
+        speed = self._clamp_u8(timeout)
+        await self._write_goto_nonblocking(position=255, speed=speed, force=force)
+        return True
+
+    async def continuous_grip(self, timeout: int) -> bool:
+        """
+        Keep commanding a close with some speed. Non-blocking.
+        """
+        await self._ensure_active()
+        speed = self._clamp_u8(timeout)
+        await self._write_goto_nonblocking(position=255, speed=speed, force=self.default_force)
+        return True
+
+    async def advanced_release(self, min_pressure: int, max_pressure: int, timeout: int) -> bool:
+        """
+        Non-blocking open. 'timeout' mapped to speed.
+        """
+        await self._ensure_active()
+        speed = self._clamp_u8(timeout)
+        await self._write_goto_nonblocking(position=0, speed=speed, force=self.default_force)
+        return True
+
+    # Convenience (not in VacuumGripper, but handy)
+    async def move(self, position: int, speed: Optional[int] = None, force: Optional[int] = None) -> bool:
+        await self._ensure_active()
+        await self._write_goto_nonblocking(position=position, speed=speed, force=force)
+        return True

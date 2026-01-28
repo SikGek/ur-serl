@@ -109,14 +109,19 @@ class UrImpedanceController(threading.Thread):
     async def start_ur_interfaces(self, gripper=True):
         self.ur_control = RTDEControlInterface(self.robot_ip)
         self.ur_receive = RTDEReceiveInterface(self.robot_ip)
+        # port = getattr(self.config, "GRIPPER_USB_PORT", "auto")
+        # slave = getattr(self.config, "GRIPPER_SLAVE_ADDRESS", 9)
         if gripper:
             # self.robotiq_gripper = Robotiq2F85Gripper(self.robot_ip)
             # await self.robotiq_gripper.connect()
             # await self.robotiq_gripper.activate()
             self.robotiq_gripper = Robotiq2F85Gripper(
-            port=self.config.GRIPPER_USB_PORT,   # e.g. "/dev/ttyUSB0"
-            slave_id=getattr(self.config, "GRIPPER_SLAVE_ID", 9),
+            portname=self.config.GRIPPER_USB_PORT,   # e.g. "/dev/ttyUSB0"
+            slaveaddress=getattr(self.config, "GRIPPER_SLAVE_ID", 9),
+            emulate_vacuum_pressure=False,
             )   
+            await self.robotiq_gripper.connect()
+            await self.robotiq_gripper.activate()
         if self.verbose:
             gr_string = "(with gripper) " if gripper else ""
             print(f"[RIC] Controller connected to robot {gr_string}at: {self.robot_ip}")
