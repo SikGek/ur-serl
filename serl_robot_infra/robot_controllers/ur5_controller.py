@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation as R
 from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 
-from ur_env.envs.basic_env import config
+# Lazy import to avoid circular dependency: config is imported inside __init__ where it's needed
 from ur_env.utils.vacuum_gripper import VacuumGripper
 # from ur_env.utils.robotiq2f_85 import Robotiq2F85Gripper
 from ur_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2rotvec, pose2quat
@@ -40,6 +40,11 @@ class UrImpedanceController(threading.Thread):
             *args,
             **kwargs
     ):
+        # Lazy import to avoid circular dependency
+        if config is None:
+            from ur_env.envs.basic_env import config as default_config
+            config = default_config
+        
         super(UrImpedanceController, self).__init__(*args, **kwargs)
         self._stop = threading.Event()
         self._reset = threading.Event()
