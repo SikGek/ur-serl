@@ -615,6 +615,7 @@ class UR5Env(gym.Env):
 
         # calibrate()
         self.controller.stop()
+        self.controller.join(timeout=2.0)
         time.sleep(1)
         self.calibration_thread.calibrate()
 
@@ -721,6 +722,7 @@ class UR5Env(gym.Env):
     def close(self):
         if self.controller:
             self.controller.stop()
+            self.controller.join(timeout=2.0)
         if self.pose_est:
             self.box_pose_est.stop()
         super().close()

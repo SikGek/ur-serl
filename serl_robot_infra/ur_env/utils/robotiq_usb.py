@@ -51,6 +51,13 @@ class Robotiq2F85USBGripper:
                         so your existing vacuum-gripper logic doesn't instantly break.
                 - False: get_current_pressure() returns gPO (0..255) = actual gripper position.
         """
+        # Shutdown guard: once True, we never schedule new to_thread() work.
+        self._closing = False
+
+        # Sentinel used by _call_blocking_safe so we can distinguish shutdown
+        # from legitimate None returns of blocking functions.
+        self._SHUTDOWN = object()
+
         self.portname = portname
         self.slaveaddress = int(slaveaddress)
 
@@ -80,7 +87,36 @@ class Robotiq2F85USBGripper:
         """
         Run blocking I/O (serial Modbus) off-thread.
         """
-        return await asyncio.to_thread(fn, *args, **kwargs)
+        if self._closing:
+            return self._SHUTDOWN
+
+        # If there's no running loop or it's closing, do not schedule work.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return self._SHUTDOWN
+
+        if loop.is_closed():
+            return self._SHUTDOWN
+
+        try:
+            return await asyncio.to_thread(fn, *args, **kwargs)
+
+        except asyncio.CancelledError:
+            # Task cancelled during shutdown — treat as expected.
+            return self._SHUTDOWN
+
+        except RuntimeError as e:
+            msg = str(e).lower()
+
+            # Common shutdown errors from executor teardown / interpreter shutdown
+            if "cannot schedule new futures" in msg and "shutdown" in msg:
+                return self._SHUTDOWN
+            if "event loop is closed" in msg:
+                return self._SHUTDOWN
+
+            # Anything else is a real error
+            raise
 
     def _require_connected(self):
         if self._gripper is None:
@@ -112,7 +148,11 @@ class Robotiq2F85USBGripper:
             ):
                 return dict(self._cache)
 
-            await self._call_blocking(self._gripper.readAll)
+            res = await self._call_blocking(self._gripper.readAll)
+            if res is self._SHUTDOWN:
+                # During shutdown: return best-effort cache or empty dict
+                return dict(self._cache) if self._cache is not None else {}
+
             data = dict(getattr(self._gripper, "paramDic", {}))
             self._cache = data
             self._cache_time = now
@@ -137,7 +177,10 @@ class Robotiq2F85USBGripper:
         reg2 = spd * 256 + frc
 
         async with self._lock:
-            await self._call_blocking(self._gripper.write_registers, 1000, [reg0, reg1, reg2])
+            res = await self._call_blocking(self._gripper.write_registers, 1000, [reg0, reg1, reg2])
+            if res is self._SHUTDOWN:
+                return
+
 
         # Invalidate cache so next read sees fresh state
         self._cache = None
@@ -166,14 +209,22 @@ class Robotiq2F85USBGripper:
 
         async with self._lock:
             # Create instrument (blocking)
-            self._gripper = await self._call_blocking(RobotiqGripper, self.portname, self.slaveaddress)
+            g = await self._call_blocking(RobotiqGripper, self.portname, self.slaveaddress)
+            if g is self._SHUTDOWN:
+                return
+            self._gripper = g
+
             self._cache = None
             self._activated_once = False
 
     async def disconnect(self) -> None:
         """
         Close the serial port if available.
+        Safe to call during shutdown.
         """
+        # First: mark closing so no further to_thread calls get scheduled
+        self._closing = True
+
         if self._gripper is None:
             return
 
@@ -181,11 +232,13 @@ class Robotiq2F85USBGripper:
             ser = getattr(self._gripper, "serial", None)
             try:
                 if ser is not None:
-                    await self._call_blocking(ser.close)
+                    res = await self._call_blocking(ser.close)
+                    # ignore shutdown sentinel
             finally:
                 self._gripper = None
                 self._cache = None
                 self._activated_once = False
+
 
     async def activate(self) -> None:
         """

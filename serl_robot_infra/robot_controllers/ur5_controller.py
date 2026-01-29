@@ -200,13 +200,13 @@ class UrImpedanceController(threading.Thread):
         force = self.ur_receive.getActualTCPForce()
         # pressure = gs.pos_norm
         # obj_status = 1.0 if gs.object_detected else 0.0
-        pos = await self.robotiq_gripper.get_position_byte()   # 0..255
+        grip_pos = await self.robotiq_gripper.get_position_byte()   # 0..255
         obj = await self.robotiq_gripper.get_object_status()
 
         # 3-> no object detected, 0-> sucking empty, [1, 2] obj detected
         # grip_status = [-1., 1., 1., 0.][obj_status.value]
         # grip_status = obj_status
-        closed_norm = pos / 255.0  # 0=open, 1=closed
+        closed_norm = grip_pos / 255.0  # 0=open, 1=closed
         object_detected = 1.0 if obj.value in (1, 2) else 0.0
         # pressure = pressure if pressure < 99 else 0     # 100 no obj, 99 sucking empty, so they are ignored
         # grip status, 0->neutral, -1->bad (sucking but no obj), 1-> good (sucking and obj)
@@ -443,6 +443,10 @@ class UrImpedanceController(threading.Thread):
             if self.robotiq_gripper:
                 await self.send_gripper_command(force_release=True)
                 time.sleep(0.05)
+                try:
+                    await self.robotiq_gripper.disconnect()
+                except Exception:
+                    pass
 
             # move to real home
             pi = 3.1415
