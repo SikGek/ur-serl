@@ -21,7 +21,7 @@ class UR5PlacingCornerConfig(DefaultEnvConfig):
     ACTION_SCALE = np.array([0.01, 0.05, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "192.168.1.66"
-    CONTROLLER_HZ = 100
+    CONTROLLER_HZ = 10
     GRIPPER_TIMEOUT = 2000  # in milliseconds
     ERROR_DELTA: float = 0.05
     FORCEMODE_DAMPING: float = 0.0  # faster

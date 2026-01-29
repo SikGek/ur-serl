@@ -31,7 +31,7 @@ class UrImpedanceController(threading.Thread):
     def __init__(
             self,
             robot_ip,
-            frequency=100,
+            frequency=10,
             kp=10000,
             kd=2200,
             config=None,
@@ -200,7 +200,7 @@ class UrImpedanceController(threading.Thread):
         force = self.ur_receive.getActualTCPForce()
         # pressure = gs.pos_norm
         # obj_status = 1.0 if gs.object_detected else 0.0
-        grip_pos = await self.robotiq_gripper.get_position_byte()   # 0..255
+        grip_pos = await self.robotiq_gripper.get_current_pressure()   # 0..255
         obj = await self.robotiq_gripper.get_object_status()
 
         # 3-> no object detected, 0-> sucking empty, [1, 2] obj detected
@@ -445,13 +445,13 @@ class UrImpedanceController(threading.Thread):
                 time.sleep(0.05)
                 try:
                     await self.robotiq_gripper.disconnect()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(e)
 
             # move to real home
             pi = 3.1415
-            reset_Q = np.deg2rad([-28.84, -80.1, 110.96, -120.75, -89.77, -28.93])
-            self.ur_control.moveJ(reset_Q, speed=1., acceleration=0.8)
+            reset_Q = np.deg2rad([272.26, -69.24, -112.58, -90.35, 89.82, 180.5])
+            self.ur_control.moveJ(reset_Q, speed=0.5, acceleration=0.5)
 
             # terminate
             self.ur_control.disconnect()

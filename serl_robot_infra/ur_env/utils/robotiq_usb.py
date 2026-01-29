@@ -38,7 +38,7 @@ class Robotiq2F85USBGripper:
         default_speed: int = 255,
         default_force: int = 150,
         cache_period_s: float = 0.02,
-        emulate_vacuum_pressure: bool = True,
+        emulate_vacuum_pressure: bool = False,
     ) -> None:
         """
         Args:

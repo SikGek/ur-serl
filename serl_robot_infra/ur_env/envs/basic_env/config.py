@@ -36,7 +36,7 @@ class UR5PickingConfig(DefaultEnvConfig):
     # RESET_Q = np.array([[1.34231, -1.24585, 1.94961, -2.27267, -1.56428, -0.22641]])   # original one
     # RESET_Q = np.array([[1.3463, -1.3584,  1.9014, -2.1243, -1.5758, -0.2312]])
     RESET_Q = np.array([
-        [-36.26, -82.24, 128.58, -136.35, -89.82, -46.5],
+        [272.26, -69.24, -112.58, -90.35, 89.82, 180.5],
         # [-5, -78.62, 122.84, -134.22, -89.81, -13.03],
         # [10, -75.62, 122.84, -134.22, -89.81, -13.03],
     ])
@@ -51,14 +51,15 @@ class UR5PickingConfig(DefaultEnvConfig):
     ACTION_SCALE = np.array([0.01, 0.05, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "192.168.56.2"
-    CONTROLLER_HZ = 100
-    GRIPPER_TIMEOUT = 2000  # in milliseconds
+    CONTROLLER_HZ = 10
+    GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.0  # faster
+    FORCEMODE_DAMPING: float = 0.5  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
     GRIPPER_USB_PORT = "/dev/ttyUSB0"
+    GRIPPER_SLAVE_ID = 9
     GOAL_POSE = np.array([0.024, 0.02, 0.21, 0., 0., 3.14])     #box_1
     GOAL_POSE = np.array([0.03, 0.03, 0.21, 0., 0., 3.14])      #box_340
     GOAL_POSE = np.array([0.035, 0.03, 0.21, 0., 0., 3.14])     #box_330
@@ -67,7 +68,7 @@ class UR5PickingConfig(DefaultEnvConfig):
     
     ROTATION_GENERALIZATION = R.from_euler("xyz", np.array([0, 0, 0])).as_matrix() # rotation applied to the box to bring it back to the training orientation
     BOX_ERROR = np.array([0.0, 0.0, 0.0])
-    POSE_ESTIMATION = True
+    POSE_ESTIMATION = False
     POSE_ESTIMATION_IP = "ws://localhost:7777"
     WF_rot = np.array([[-1,  0,  0],
                         [ 0,  0, 1],

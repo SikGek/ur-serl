@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation as R
 from ur_env.utils.rotations import quat_2_euler, quat_2_mrp, quat_2_rotvec
 
 from ur_env.utils.vacuum_gripper import VacuumGripper
-
+from ur_env.spacemouse.fake_spacemouse import FakeSpaceMouseExpert
 
 ROT90 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 ROT_GENERAL = np.array([np.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
@@ -277,12 +277,17 @@ class InterruptActionWrapper(gym.ActionWrapper):
         return self.env.step(action)
 
 class SpacemouseIntervention(gym.ActionWrapper):
-    def __init__(self, env, gripper_action_span=3):
+    def __init__(self, env, gripper_action_span=3,device_number: int = 0, verbose=True):
         super().__init__(env)
 
         self.gripper_enabled = True
 
-        self.expert = SpaceMouseExpert()
+        try:
+            self.expert = SpaceMouseExpert(device_number=device_number)
+        except Exception as e:
+            self.expert = FakeSpaceMouseExpert(verbose)
+            print(f"openend fake SpacemouseExpert since: {e}")
+
         self.last_intervene = 0
         self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
         self.right = self.left.copy()
@@ -339,7 +344,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         - expert_a: spacemouse output adapted to force space (action)
         """
 
-        position = super().get_wrapper_attr("curr_pos")  # get position from ur_env
+        # position = super().get_wrapper_attr("curr_pos")  # get position from ur_env
         # position = self.unwrapped.curr_pos
         # z_angle = np.arctan2(position[1], position[0])  # get first joint angle
 
