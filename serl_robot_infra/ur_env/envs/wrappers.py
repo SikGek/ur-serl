@@ -371,7 +371,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         
         info["left"] = self.left.any()
         info["right"] = self.right.any()
-        print("intervening....")
+        # print(action, new_action)
         # Return the observation, reward, done flag, truncation flag, and info dictionary.
         return obs, rew, done, truncated, info
 
