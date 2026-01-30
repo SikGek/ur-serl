@@ -49,7 +49,9 @@ def on_esc(key):
 
 if __name__ == "__main__":
     print("[STARTUP] Initializing environment...")
-    env = gym.make("box_picking_basic_env")
+    env = gym.make("box_picking_basic_env",
+                   camera_mode="rgb",
+                   max_episode_length=1000,)
     env = SpacemouseIntervention(env, verbose=True)  # Enable verbose input monitoring
     env = RelativeFrame(env)
     env = Quat2MrpWrapper(env)
