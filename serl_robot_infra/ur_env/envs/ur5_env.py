@@ -319,7 +319,7 @@ class UR5Env(gym.Env):
         """standard gym step function."""
         start_time = time.time()
         action = np.clip(action, self.action_space.low, self.action_space.high)
-
+        # print(action)
         # position
         next_pos = self.curr_pos.copy()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0] # + self.trajectory_dir
@@ -333,7 +333,7 @@ class UR5Env(gym.Env):
         safe_pos = self.clip_safety_box(next_pos)
         self._send_pos_command(safe_pos)
         self._send_gripper_command(gripper_action)
-
+        # print(safe_pos)
         self.curr_path_length += 1
 
         obs = self._get_obs(action)
@@ -373,7 +373,7 @@ class UR5Env(gym.Env):
             self.resetQ[:] = np.roll(self.resetQ, -1, axis=0)  # roll one (not random)
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
-
+        print(reset_Q)
         self._send_reset_command(reset_Q)
 
         while not self.controller.is_reset():

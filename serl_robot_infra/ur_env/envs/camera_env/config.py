@@ -51,7 +51,7 @@ class UR5CameraConfigBox5(DefaultEnvConfig):
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.1, 1., 1., 1.])
 
     REALSENSE_CAMERAS = {
-        "wrist": "218622277164",
+        "wrist": "239122070813",
         # "shoulder": "218622279756"
     }
 

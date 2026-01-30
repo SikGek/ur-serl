@@ -35,8 +35,13 @@ from scipy.spatial.transform import Rotation as R
 class UR5PickingConfig(DefaultEnvConfig):
     # RESET_Q = np.array([[1.34231, -1.24585, 1.94961, -2.27267, -1.56428, -0.22641]])   # original one
     # RESET_Q = np.array([[1.3463, -1.3584,  1.9014, -2.1243, -1.5758, -0.2312]])
+    # RESET_Q = np.array([
+    #     [272.26, -69.24, -112.58, -90.35, 89.82, 180.5],
+    #     # [-5, -78.62, 122.84, -134.22, -89.81, -13.03],
+    #     # [10, -75.62, 122.84, -134.22, -89.81, -13.03],
+    # ])
     RESET_Q = np.array([
-        [272.26, -69.24, -112.58, -90.35, 89.82, 180.5],
+        [271.07, -93.98, -122.14, -166.376, 270.78, 96.59],
         # [-5, -78.62, 122.84, -134.22, -89.81, -13.03],
         # [10, -75.62, 122.84, -134.22, -89.81, -13.03],
     ])
@@ -52,7 +57,7 @@ class UR5PickingConfig(DefaultEnvConfig):
 
     ROBOT_IP: str = "192.168.56.2"
     CONTROLLER_HZ = 100
-    GRIPPER_TIMEOUT = 5000  # in milliseconds
+    GRIPPER_TIMEOUT = 2000  # in milliseconds
     ERROR_DELTA: float = 0.05
     FORCEMODE_DAMPING: float = 0.5  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
