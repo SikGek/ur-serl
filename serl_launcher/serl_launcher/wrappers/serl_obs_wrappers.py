@@ -1,103 +1,50 @@
 import gymnasium as gym
-from gymnasium import spaces
-from gymnasium.core import ObsType, WrapperObsType
 from gymnasium.spaces import flatten_space, flatten
 
 
 class SERLObsWrapper(gym.ObservationWrapper):
     """
-    This observation wrapper treats the observation space as a dictionary
+    This observation wrapper treat the observation space as a dictionary
     of a flattened state space and the images.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, proprio_keys=None):
         super().__init__(env)
+        self.proprio_keys = proprio_keys
+        if self.proprio_keys is None:
+            self.proprio_keys = list(self.env.observation_space["state"].keys())
+
+        self.proprio_space = gym.spaces.Dict(
+            {key: self.env.observation_space["state"][key] for key in self.proprio_keys}
+        )
+
         self.observation_space = gym.spaces.Dict(
             {
-                "state": flatten_space(self.env.observation_space["state"]),
-                **(self.env.observation_space["images"] if "images" in self.env.observation_space.spaces else {}),
+                "state": flatten_space(self.proprio_space),
+                **(self.env.observation_space["images"]),
             }
         )
 
     def observation(self, obs):
         obs = {
-            "state": flatten(self.env.observation_space["state"], obs["state"]),
-            **(obs["images"] if "images" in obs else {}),
+            "state": flatten(
+                self.proprio_space,
+                {key: obs["state"][key] for key in self.proprio_keys},
+            ),
+            **(obs["images"]),
         }
         return obs
 
+    def reset(self, **kwargs):
+        obs, info =  self.env.reset(**kwargs)
+        return self.observation(obs), info
 
-class SerlObsWrapperNoImages(gym.ObservationWrapper):
-    """
-    This observation wrapper treats the observation space as a flattened state
-    space, if no images are present.
-    """
-
-    def __init__(self, env):
-        super().__init__(env)
-        self.observation_space = flatten_space(self.env.observation_space["state"])
-
-    def observation(self, obs):
-        obs = flatten(self.env.observation_space["state"], obs["state"])
-        return obs
-
-class SerlObsWrapperTrajBox(gym.ObservationWrapper):
-    """
-    This observation wrapper treats the observation space as a flattened
-    space, if no images are present.
-    """
-
-    def __init__(self, env):
-        super().__init__(env)
-        # Create a flattened space that includes all observation components
-        
-        self.observation_space = flatten_space(self.env.observation_space["state"])
-
-    def observation(self, obs):
-        # Flatten state component
-        obs = flatten(self.env.observation_space["state"], obs["state"])
-        return obs
-
-
-class ScaleObservationWrapper(gym.ObservationWrapper):
-    """
-    This observation wrapper scales the observations with the provided hyperparams
-    (to somewhat normalize the observations space)
-    """
-
-    def __init__(self,
-                 env,
-                 translation_scale=100.,
-                 rotation_scale=10.,
-                 force_scale=1.,
-                 torque_scale=10.
-                 ):
-        super().__init__(env)
-        self.translation_scale = translation_scale
-        self.rotation_scale = rotation_scale
-        self.force_scale = force_scale
-        self.torque_scale = torque_scale
-
-    def scale_wrapper_get_scales(self):
-        return dict(
-            translation_scale=self.translation_scale,
-            rotation_scale=self.rotation_scale,
-            force_scale=self.force_scale,
-            torque_scale=self.torque_scale
-        )
-
-    def observation(self, obs):
-        obs["state"]["tcp_pose"][:3] *= self.translation_scale
-        obs["state"]["tcp_pose"][3:] *= self.rotation_scale
-        obs["state"]["tcp_vel"][:3] *= self.translation_scale
-        obs["state"]["tcp_vel"][3:] *= self.rotation_scale
-        obs["state"]["tcp_force"] *= self.force_scale
-        obs["state"]["tcp_torque"] *= self.torque_scale
-        obs["state"]["boxes"][:3] *= self.translation_scale
-        obs["state"]["boxes"][3:] *= self.rotation_scale
-        obs["state"]["trajectory"][:3] *= self.translation_scale
-        obs["state"]["trajectory"][3:] *= self.rotation_scale
-        obs["state"]["goal_pose"][:3] *= self.translation_scale
-        obs["state"]["goal_pose"][3:] *= self.rotation_scale
-        
+def flatten_observations(obs, proprio_space, proprio_keys):
+        obs = {
+            "state": flatten(
+                proprio_space,
+                {key: obs["state"][key] for key in proprio_keys},
+            ),
+            **(obs["images"]),
+        }
         return obs

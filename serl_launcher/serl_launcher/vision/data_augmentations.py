@@ -2,122 +2,8 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import jax.lax as lax
-
-ROT90 = jnp.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
-ROT_GENERAL = jnp.array([jnp.eye(3), ROT90, ROT90 @ ROT90, ROT90.transpose()])
-
-"""     # not used anymore, since we are no longer using euler angles
-import jaxlie
-
-def euler_xyz_to_yxz(xyz_angles):
-    # Create SO3 object from xyz Euler angles
-    so3 = jaxlie.SO3.from_rpy_radians(
-        roll=xyz_angles[0],
-        pitch=xyz_angles[1],
-        yaw=xyz_angles[2]
-    )
-    rot_matrix = so3.as_matrix()
-
-    # Extract yxz Euler angles from rotation matrix
-    y = jnp.arctan2(-rot_matrix[2, 0], rot_matrix[2, 2])
-    x = jnp.arcsin(jnp.clip(rot_matrix[2, 1], -1.0, 1.0))       # might prevent NaN's
-    z = jnp.arctan2(-rot_matrix[0, 1], rot_matrix[1, 1])
-    return jnp.array([y, x, z])
 
 
-def orient_rot90_jax(array: jnp.ndarray, rot: int) -> jnp.ndarray:
-    assert array.shape == (3,)
-
-    def single_90_rotation(arr):
-        yxz = euler_xyz_to_yxz(arr)
-        yxz = yxz.at[0].multiply(-1.)
-        return yxz
-
-    # Apply the rotation 'rot' number of times
-    return jax.lax.fori_loop(0, rot % 4, lambda _, arr: single_90_rotation(arr), array)
-"""
-
-
-@jax.jit
-def random_rot90_action(action: jnp.ndarray, num_rot: int):  # action is (x, y, z, rx, ry, rz, gripper)
-    assert action.shape == (7,)
-    xyz_rotated = jnp.dot(ROT_GENERAL[num_rot], action[:3])
-    orientation_rotated = jnp.dot(ROT_GENERAL[num_rot], action[3:6])
-    return jnp.concatenate([xyz_rotated, orientation_rotated, action[-1:]])
-
-
-@jax.jit
-def batched_random_rot90_action(actions, rng):
-    assert actions.shape[-1:] == (7,)
-    num_rot = jax.random.randint(rng, (actions.shape[0],), 0, 4)
-
-    # jax.debug.print("rotation: {}", num_rot[0])
-
-    actions = jax.vmap(
-        lambda a, k: random_rot90_action(a, k), in_axes=(0, 0), out_axes=0
-    )(actions, num_rot)
-
-    return actions
-
-
-@partial(jax.jit, static_argnames="num_batch_dims")
-def batched_random_rot90_state(state, rng, *, num_batch_dims: int = 1):
-    original_shape = state.shape
-    state = jnp.reshape(state, (-1, *state.shape[num_batch_dims:]))
-    num_rot = jax.random.randint(rng, (state.shape[0],), 0, 4)
-
-    state = jax.vmap(
-        lambda s, k: random_rot90_state(s, k), in_axes=(0, 0), out_axes=0
-    )(state, num_rot)
-
-    return state.reshape(original_shape)
-
-
-def random_rot90_state(state, num_rot):
-    assert state.shape[-1] == 27
-
-    """
-    indexes are (action[0:7], gripper[7:9], force[9:12], pose[12:15], orientation[15:18],
-    torque[18:21], velocity[21:24], orientation velocity[24:27])
-    """
-    indices = jnp.array([0, 3, 9, 12, 15, 18, 21, 24])
-
-    def rotate(i, state):
-        part = lax.dynamic_slice(state, (indices[i],), (3,))
-        rotated = jnp.dot(ROT_GENERAL[num_rot], part)
-        return lax.dynamic_update_slice(state, rotated, (indices[i],))
-
-    # Apply rotations sequentially
-    state = jax.lax.fori_loop(0, indices.shape[0], rotate, state)
-    return state
-
-
-@partial(jax.jit, static_argnames="num_batch_dims")
-def batched_random_rot90_voxel(voxel_grid, rng, *, num_batch_dims: int = 1):
-    original_shape = voxel_grid.shape
-    voxel_grid = jnp.reshape(voxel_grid, (-1, *voxel_grid.shape[num_batch_dims:]))
-
-    num_rot = jax.random.randint(rng, (voxel_grid.shape[0],), 0, 4)
-
-    voxel_grid = jax.vmap(
-        lambda v, k: random_rot90_voxel(v, k), in_axes=(0, 0), out_axes=0
-    )(voxel_grid, num_rot)
-
-    return voxel_grid.reshape(original_shape)
-
-
-@partial(jax.jit, static_argnames="axes")
-def rot90_traceable(m, k=1, axes=(0, 1)):
-    return jax.lax.switch(k, [partial(jnp.rot90, m, k=i, axes=axes) for i in range(4)])
-
-
-@jax.jit
-def random_rot90_voxel(voxel_grid, num_rot):
-    return rot90_traceable(voxel_grid, k=num_rot, axes=(-3, -2))
-
-
-@partial(jax.jit, static_argnames="padding")
 def random_crop(img, rng, *, padding):
     crop_from = jax.random.randint(rng, (2,), 0, 2 * padding + 1)
     crop_from = jnp.concatenate([crop_from, jnp.zeros((1,), dtype=jnp.int32)])
@@ -149,35 +35,11 @@ def batched_random_crop(img, rng, *, padding, num_batch_dims: int = 1):
     img = jnp.reshape(img, original_shape)
     return img
 
-
-def random_shift_3d(img, rng, *, padding):
-    crop_from = jax.random.randint(rng, (3,), 0, 2 * padding + 1)
-    padded_img = jnp.pad(
-        img,
-        (
-            (padding, padding),
-            (padding, padding),
-            (padding, padding),
-        ),
-        mode="constant"
-    )
-    return jax.lax.dynamic_slice(padded_img, crop_from, img.shape)
-
-
-@partial(jax.jit, static_argnames=("padding", "num_batch_dims"))
-def batched_random_shift_voxel(img, rng, *, padding, num_batch_dims: int = 1):
-    original_shape = img.shape
-    img = jnp.reshape(img, (-1, *img.shape[num_batch_dims:]))
-    # shape (B, B2, X, Y, Z)
-
-    rngs = jax.random.split(rng, img.shape[0])
-    img = jax.vmap(
-        lambda i, r: random_shift_3d(i, r, padding=padding), in_axes=(0, 0), out_axes=0
-    )(img, rngs)
-
-    # Restore batch dims
-    img = jnp.reshape(img, original_shape)
-    return img
+def resize(image, image_dim):
+    assert len(image_dim) == 2
+    new_shape = list(image.shape)
+    new_shape[-3:-1] = image_dim
+    return jax.image.resize(image, new_shape, method="bilinear")
 
 
 def _maybe_apply(apply_fn, inputs, rng, apply_prob):
@@ -210,7 +72,7 @@ def _gaussian_blur_single_image(image, kernel_size, padding, sigma):
     radius = int(kernel_size / 2)
     kernel_size_ = 2 * radius + 1
     x = jnp.arange(-radius, radius + 1).astype(jnp.float32)
-    blur_filter = jnp.exp(-(x ** 2) / (2.0 * sigma ** 2))
+    blur_filter = jnp.exp(-(x**2) / (2.0 * sigma**2))
     blur_filter = blur_filter / jnp.sum(blur_filter)
     blur_v = jnp.reshape(blur_filter, [kernel_size_, 1, 1, 1])
     blur_h = jnp.reshape(blur_filter, [1, kernel_size_, 1, 1])
@@ -227,7 +89,7 @@ def _gaussian_blur_single_image(image, kernel_size, padding, sigma):
 
 
 def _random_gaussian_blur(
-        image, rng, *, kernel_size, padding, sigma_min, sigma_max, apply_prob
+    image, rng, *, kernel_size, padding, sigma_min, sigma_max, apply_prob
 ):
     """Applies a random gaussian blur."""
     apply_rng, transform_rng = jax.random.split(rng)
@@ -292,22 +154,22 @@ def hsv_to_rgb(h, s, v):
     x = c * (1 - jnp.abs(fmodu - 1))
     hcat = jnp.floor(dh).astype(jnp.int32)
     rr = (
-            jnp.where(
-                (hcat == 0) | (hcat == 5), c, jnp.where((hcat == 1) | (hcat == 4), x, 0)
-            )
-            + m
+        jnp.where(
+            (hcat == 0) | (hcat == 5), c, jnp.where((hcat == 1) | (hcat == 4), x, 0)
+        )
+        + m
     )
     gg = (
-            jnp.where(
-                (hcat == 1) | (hcat == 2), c, jnp.where((hcat == 0) | (hcat == 3), x, 0)
-            )
-            + m
+        jnp.where(
+            (hcat == 1) | (hcat == 2), c, jnp.where((hcat == 0) | (hcat == 3), x, 0)
+        )
+        + m
     )
     bb = (
-            jnp.where(
-                (hcat == 3) | (hcat == 4), c, jnp.where((hcat == 2) | (hcat == 5), x, 0)
-            )
-            + m
+        jnp.where(
+            (hcat == 3) | (hcat == 4), c, jnp.where((hcat == 2) | (hcat == 5), x, 0)
+        )
+        + m
     )
     return rr, gg, bb
 
@@ -368,17 +230,17 @@ def _to_grayscale(image):
 
 
 def color_transform(
-        image,
-        rng,
-        *,
-        brightness,
-        contrast,
-        saturation,
-        hue,
-        to_grayscale_prob,
-        color_jitter_prob,
-        apply_prob,
-        shuffle
+    image,
+    rng,
+    *,
+    brightness,
+    contrast,
+    saturation,
+    hue,
+    to_grayscale_prob,
+    color_jitter_prob,
+    apply_prob,
+    shuffle
 ):
     """Applies color jittering to a single image."""
     apply_rng, transform_rng = jax.random.split(rng)
@@ -450,7 +312,7 @@ def random_flip(image, rng):
 
 
 def gaussian_blur(
-        image, rng, *, blur_divider=10.0, sigma_min=0.1, sigma_max=2.0, apply_prob=1.0
+    image, rng, *, blur_divider=10.0, sigma_min=0.1, sigma_max=2.0, apply_prob=1.0
 ):
     """Applies gaussian blur to a batch of images.
     Args:

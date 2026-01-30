@@ -1,5 +1,5 @@
 import functools
-from typing import Any, Callable, Dict, Mapping, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Mapping, Sequence, Tuple, Union, Optional
 
 import flax
 import flax.linen as nn
@@ -112,6 +112,7 @@ class JaxRLTrainState(struct.PyTreeNode):
     txs: Any = struct.field(pytree_node=False)
     opt_states: Any
     rng: PRNGKey
+    epsilon: float = 0.0
 
     @staticmethod
     def _tx_tree_map(*args, **kwargs):
@@ -222,7 +223,7 @@ class JaxRLTrainState(struct.PyTreeNode):
 
     @classmethod
     def create(
-        cls, *, apply_fn, params, txs, target_params=None, rng=jax.random.PRNGKey(0)
+        cls, *, apply_fn, params, txs, target_params=None, rng=jax.random.PRNGKey(0), epsilon=0.0
     ):
         """
         Initializes a new train state.
@@ -242,4 +243,5 @@ class JaxRLTrainState(struct.PyTreeNode):
             txs=txs,
             opt_states=cls._tx_tree_map(lambda tx: tx.init(params), txs),
             rng=rng,
+            epsilon=epsilon,
         )

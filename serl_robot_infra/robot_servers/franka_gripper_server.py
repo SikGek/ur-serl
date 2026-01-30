@@ -18,14 +18,21 @@ class FrankaGripperServer(GripperServer):
         self.gripper_sub = rospy.Subscriber(
             "/franka_gripper/joint_states", JointState, self._update_gripper
         )
+        self.binary_gripper_pose = 0
 
     def open(self):
+        if self.binary_gripper_pose == 0:
+            return
         msg = MoveActionGoal()
+        # msg.goal.width = 0.025
         msg.goal.width = 0.09
         msg.goal.speed = 0.3
         self.grippermovepub.publish(msg)
+        self.binary_gripper_pose = 0
 
     def close(self):
+        if self.binary_gripper_pose == 1:
+            return
         msg = GraspActionGoal()
         msg.goal.width = 0.01
         msg.goal.speed = 0.3
@@ -33,6 +40,19 @@ class FrankaGripperServer(GripperServer):
         msg.goal.epsilon.outer = 1
         msg.goal.force = 130
         self.grippergrasppub.publish(msg)
+        self.binary_gripper_pose = 1
+
+    def close_slow(self):
+        if self.binary_gripper_pose == 1:
+            return
+        msg = GraspActionGoal()
+        msg.goal.width = 0.01
+        msg.goal.speed = 0.1
+        msg.goal.epsilon.inner = 1
+        msg.goal.epsilon.outer = 1
+        msg.goal.force = 130
+        self.grippergrasppub.publish(msg)
+        self.binary_gripper_pose = 1
 
     def move(self, position: int):
         """Move the gripper to a specific position in range [0, 255]"""
@@ -43,4 +63,4 @@ class FrankaGripperServer(GripperServer):
 
     def _update_gripper(self, msg):
         """internal callback to get the latest gripper position."""
-        self.gripper_pos = np.sum(msg.position)
+        self.gripper_pos = np.sum(msg.position) / 0.08

@@ -72,6 +72,14 @@ class ChunkingWrapper(gym.Wrapper):
         return (stack_obs(self.current_obs), reward, done, trunc, info)
 
     def reset(self, **kwargs):
-        obs, info = self.env.reset()
+        obs, info = self.env.reset(**kwargs)
         self.current_obs.extend([obs] * self.obs_horizon)
         return stack_obs(self.current_obs), info
+
+
+def post_stack_obs(obs, obs_horizon=1):
+    if obs_horizon != 1:
+        # TODO: Support proper stacking
+        raise NotImplementedError("Only obs_horizon=1 is supported for now")
+    obs = {k: v[None] for k, v in obs.items()}
+    return obs

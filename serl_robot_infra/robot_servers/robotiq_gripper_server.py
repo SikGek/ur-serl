@@ -49,12 +49,16 @@ class RobotiqGripperServer(GripperServer):
         self.gripperpub.publish(self.gripper_command)
 
     def move(self, position):
-        gripper_command = self._generate_gripper_command(position, self.gripper_command)
+        self.gripper_command = self._generate_gripper_command(position, self.gripper_command)
+        self.gripperpub.publish(self.gripper_command)
+
+    def close_slow(self):
+        self.gripper_command = self._generate_gripper_command("cs", self.gripper_command)
         self.gripperpub.publish(self.gripper_command)
 
     def _update_gripper(self, msg):
         """internal callback to get the latest gripper position."""
-        self.gripper_pos = msg.gPO
+        self.gripper_pos = 1 - msg.gPO / 255
 
     def _generate_gripper_command(self, char, command):
         """Update the gripper command according to the character entered by the user."""
@@ -63,17 +67,24 @@ class RobotiqGripperServer(GripperServer):
             command.rACT = 1
             command.rGTO = 1
             command.rSP = 255
-            command.rFR = 150
+            command.rFR = 30
 
-        if char == "r":
+        elif char == "r":
             command = outputMsg.Robotiq2FGripper_robot_output()
             command.rACT = 0
+            command.rSP = 255
 
-        if char == "c":
+        elif char == "c":
             command.rPR = 255
+            command.rSP = 255
+        
+        elif char == "cs":
+            command.rPR = 255
+            command.rSP = 50
 
-        if char == "o":
-            command.rPR = 0
+        elif char == "o":
+            command.rPR = 175
+            command.rSP = 255
 
         # If the command entered is a int, assign this value to rPR
         # (i.e., move to this position)

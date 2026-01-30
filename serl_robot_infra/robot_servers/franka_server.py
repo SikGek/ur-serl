@@ -11,6 +11,7 @@ from scipy.spatial.transform import Rotation as R
 from absl import app, flags
 
 from franka_msgs.msg import ErrorRecoveryActionGoal, FrankaState
+from franka_msgs.srv import SetLoad
 from serl_franka_controllers.msg import ZeroJacobian
 import geometry_msgs.msg as geom_msg
 from dynamic_reconfigure.client import Client as ReconfClient
@@ -30,6 +31,11 @@ flags.DEFINE_list(
     [0, 0, 0, -1.9, -0, 2, 0],
     "Target joint angles for the robot to reset to",
 )
+flags.DEFINE_string("flask_url", 
+    "127.0.0.1",
+    "URL for the flask server to run on."
+)
+flags.DEFINE_string("ros_port", "11311", "Port for the ROS master to run on.")
 
 
 class FrankaServer:
@@ -55,6 +61,7 @@ class FrankaServer:
             ZeroJacobian,
             self._set_jacobian,
         )
+        time.sleep(1)
         self.state_sub = rospy.Subscriber(
             "franka_state_controller/franka_states", FrankaState, self._set_currpos
         )
@@ -71,7 +78,7 @@ class FrankaServer:
             ],
             stdout=subprocess.PIPE,
         )
-        time.sleep(5)
+        time.sleep(3)
 
     def stop_impedance(self):
         """Stops the impedance controller"""
@@ -162,9 +169,7 @@ class FrankaServer:
             self.vel = self.jacobian @ self.dq
         except:
             self.vel = np.zeros(6)
-            rospy.logwarn(
-                "Jacobian not set, end-effector velocity temporarily not available"
-            )
+            rospy.logwarn("Jacobian not set, end-effector velocity temporarily not available")
 
     def _set_jacobian(self, msg):
         jacobian = np.array(list(msg.zero_jacobian)).reshape((6, 7), order="F")
@@ -185,7 +190,7 @@ def main(_):
     webapp = Flask(__name__)
 
     try:
-        roscore = subprocess.Popen("roscore")
+        roscore = subprocess.Popen(f"roscore -p {FLAGS.ros_port}", shell=True)
         time.sleep(1)
     except Exception as e:
         raise Exception("roscore not running", e)
@@ -219,6 +224,21 @@ def main(_):
         "cartesian_impedance_controllerdynamic_reconfigure_compliance_param_node"
     )
 
+    rospy.wait_for_service('/franka_control/set_load')
+    set_load_service = rospy.ServiceProxy('/franka_control/set_load', SetLoad)
+
+
+    # Route for Setting Load
+    @webapp.route("/set_load", methods=["POST"])
+    def set_load():
+        data = request.json
+        mass = data['mass']
+        F_x_center_load = data['F_x_center_load']
+        load_inertia = data['load_inertia']
+        set_load_service(mass, F_x_center_load, load_inertia)
+        print("Set mass to", mass)
+        return "Set Load"
+
     # Route for Starting impedance
     @webapp.route("/startimp", methods=["POST"])
     def start_impedance():
@@ -231,17 +251,18 @@ def main(_):
     def stop_impedance():
         robot_server.stop_impedance()
         return "Stopped impedance"
+    
+    # Route for pose in euler angles
+    @webapp.route("/getpos_euler", methods=["POST"])
+    def get_pose_euler():
+        xyz = robot_server.pos[:3]
+        r = R.from_quat(robot_server.pos[3:]).as_euler("xyz")
+        return jsonify({"pose": np.concatenate([xyz, r]).tolist()})
 
     # Route for Getting Pose
     @webapp.route("/getpos", methods=["POST"])
     def get_pos():
         return jsonify({"pose": np.array(robot_server.pos).tolist()})
-
-    @webapp.route("/getpos_euler", methods=["POST"])
-    def get_pos_euler():
-        r = R.from_quat(robot_server.pos[3:])
-        euler = r.as_euler("xyz")
-        return jsonify({"pose": np.concatenate([robot_server.pos[:3], euler]).tolist()})
 
     @webapp.route("/getvel", methods=["POST"])
     def get_vel():
@@ -307,6 +328,13 @@ def main(_):
         gripper_server.close()
         return "Closed"
 
+    # Route for Closing the Gripper
+    @webapp.route("/close_gripper_slow", methods=["POST"])
+    def close_slow():
+        print("close")
+        gripper_server.close_slow()
+        return "Closed"
+
     # Route for moving the gripper
     @webapp.route("/move_gripper", methods=["POST"])
     def move_gripper():
@@ -326,7 +354,7 @@ def main(_):
     @webapp.route("/pose", methods=["POST"])
     def pose():
         pos = np.array(request.json["arr"])
-        print("Moving to", pos)
+        # print("Moving to", pos)
         robot_server.move(pos)
         return "Moved"
 
@@ -352,7 +380,7 @@ def main(_):
         reconf_client.update_configuration(request.json)
         return "Updated compliance parameters"
 
-    webapp.run(host="0.0.0.0")
+    webapp.run(host=FLAGS.flask_url)
 
 
 if __name__ == "__main__":
