@@ -15,6 +15,7 @@ flags.DEFINE_integer("successes_needed", 20, "Number of successful demos to coll
 
 def main(_):
     assert FLAGS.exp_name in CONFIG_MAPPING, 'Experiment folder not found.'
+    print(FLAGS.exp_name)
     config = CONFIG_MAPPING[FLAGS.exp_name]()
     env = config.get_environment(fake_env=False, save_video=False, classifier=True)
     
