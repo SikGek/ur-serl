@@ -24,24 +24,32 @@ from experiments.box_picking.wrapper import (
     MultiCameraBinaryRewardClassifierWrapper,
     GripperPenaltyWrapper,
 )
-
+from scipy.spatial.transform import Rotation as R
 
 class EnvConfig(DefaultEnvConfig):
     # -------- Robot / safety --------
-    ROBOT_IP: str = "192.168.0.10"      # <-- CHANGE
-    CONTROLLER_HZ: int = 500
-
+    ROBOT_IP: str = "192.168.56.2"      # <-- CHANGE
+    CONTROLLER_HZ: int = 100
+    RESET_Q = np.array([
+        [272.26, -69.24, -112.58, -90.35, 89.82, 180.5],
+        # [-5, -78.62, 122.84, -134.22, -89.81, -13.03],
+        # [10, -75.62, 122.84, -134.22, -89.81, -13.03],
+    ])
+    RESET_Q = np.deg2rad(RESET_Q)
+    RANDOM_RESET = False
+    RANDOM_XY_RANGE = (0.06,)
+    RANDOM_ROT_RANGE = (0.0,)
     # Workspace bounds (you must tune)
-    ABS_POSE_LIMIT_LOW = np.array([0.25, -0.35, 0.05, -0.35, -0.35, -0.35], dtype=np.float32)
-    ABS_POSE_LIMIT_HIGH = np.array([0.75,  0.35, 0.55,  0.35,  0.35,  0.35], dtype=np.float32)
+    ABS_POSE_LIMIT_HIGH = np.array([-0.3, 0.2, 0.4, 0.05, 0.05, 0.2])
+    ABS_POSE_LIMIT_LOW = np.array([-0.65, -0.1, 0.08, -0.05, -0.05, -0.2])
     ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
 
-    ACTION_SCALE = np.array([0.01, 0.10, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
 
     # -------- Cameras (Franka-style dict) --------
     REALSENSE_CAMERAS = {
         "wrist": {
-            "serial_number": "0123456789",   # <-- CHANGE
+            "serial_number": "239122070813",   # <-- CHANGE
             "dim": (1280, 720),
             "exposure": 10500,
         },
@@ -90,6 +98,28 @@ class EnvConfig(DefaultEnvConfig):
     MARKER_RESET_TIMEOUT_S = 3.0
 
     MAX_EPISODE_LENGTH = 150
+
+    GRIPPER_TIMEOUT = 5000  # in milliseconds
+    ERROR_DELTA: float = 0.05
+    FORCEMODE_DAMPING: float = 0.5  # faster
+    FORCEMODE_TASK_FRAME = np.zeros(6)
+    FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
+    FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
+    GRIPPER_USB_PORT = "/dev/ttyUSB0"
+    GRIPPER_SLAVE_ID = 9
+    GOAL_POSE = np.array([0.024, 0.02, 0.21, 0., 0., 3.14])     #box_1
+    GOAL_POSE = np.array([0.03, 0.03, 0.21, 0., 0., 3.14])      #box_340
+    GOAL_POSE = np.array([0.035, 0.03, 0.21, 0., 0., 3.14])     #box_330
+
+    ROTATION_GENERALIZATION = R.from_euler("xyz", np.array([0, 0, 0])).as_matrix() # rotation applied to the box to bring it back to the training orientation
+    BOX_ERROR = np.array([0.0, 0.0, 0.0])
+    POSE_ESTIMATION = False
+    POSE_ESTIMATION_IP = "ws://localhost:7777"
+    WF_rot = np.array([[-1,  0,  0],
+                        [ 0,  0, 1],
+                        [ 0, 1,  0]], dtype=np.float32)
+    LOW_PASS_FILTER = 0
+    SUCCESS_COUNT = 0
 
 
 class TrainConfig(DefaultTrainingConfig):
