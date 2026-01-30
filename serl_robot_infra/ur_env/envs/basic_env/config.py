@@ -65,7 +65,10 @@ class UR5PickingConfig(DefaultEnvConfig):
     GOAL_POSE = np.array([0.035, 0.03, 0.21, 0., 0., 3.14])     #box_330
     # GOAL_POSITION = np.array([-0.38, -0.01, -0.04])    #box_1 next to box_3
     # GOAL_POSITION = np.array([-0.38, -0.12, -0.04])    #box_5 next to box_1
-    
+    REALSENSE_CAMERAS = {
+        "wrist": "239122070813",
+        # "shoulder": "218622279756"
+    }
     ROTATION_GENERALIZATION = R.from_euler("xyz", np.array([0, 0, 0])).as_matrix() # rotation applied to the box to bring it back to the training orientation
     BOX_ERROR = np.array([0.0, 0.0, 0.0])
     POSE_ESTIMATION = False
