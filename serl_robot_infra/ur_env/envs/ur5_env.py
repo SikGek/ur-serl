@@ -83,7 +83,7 @@ class DefaultEnvConfig:
     """Default configuration for UR5Env. Fill in the values below."""
 
     RESET_Q = np.zeros((6,))
-    RANDOM_RESET = (False,)
+    RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.0,)
     RANDOM_ROT_RANGE = (0.0,)
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
@@ -383,6 +383,7 @@ class UR5Env(gym.Env):
         reset_pose = self.controller.get_target_pos()
 
         if self.random_reset:  # randomize reset position in xy plane
+            input("waiting")
             reset_shift = np.random.uniform(np.negative(self.random_xy_range), self.random_xy_range, (2,))
             reset_pose[:2] += reset_shift
 

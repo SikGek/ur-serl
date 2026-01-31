@@ -46,11 +46,14 @@ class UR5PickingConfig(DefaultEnvConfig):
     RANDOM_ROT_RANGE = (0.0,)
     # ABS_POSE_LIMIT_HIGH = np.array([0.14, -0.4, 0.2, 3.2, 0.1, 3.2])            # TODO euler rotations suck :/
     # ABS_POSE_LIMIT_LOW = np.array([-0.3, -0.7, -0.006, 3.0, -0.1, -3.2])
-    ABS_POSE_LIMIT_HIGH = np.array([-0.3, 0.2, 0.4, 0.05, 0.05, 0.2])
-    ABS_POSE_LIMIT_LOW = np.array([-0.65, -0.1, 0.08, -0.05, -0.05, -0.2])
+    # ABS_POSE_LIMIT_HIGH = np.array([-0.3, 0.2, 0.4, 0.05, 0.05, 0.2])
+    # ABS_POSE_LIMIT_LOW = np.array([-0.65, -0.1, 0.08, -0.05, -0.05, -0.2])
+    ABS_POSE_LIMIT_HIGH = np.array([5.0, -0.9, -1.56, -1.25, 1.9, 3.45])
+    ABS_POSE_LIMIT_LOW = np.array([4.5, -1.5, -2.16, -1.85, 1.26, -3.45])
     ACTION_SCALE = np.array([0.01, 0.05, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "192.168.56.2"
+
     CONTROLLER_HZ = 100
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05

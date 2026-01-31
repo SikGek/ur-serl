@@ -359,7 +359,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
     def step(self, action):
         new_action, replaced = self.action(action)
-        # print(f"new action: {new_action}")
+        print(f"new action: {new_action}")
         obs, rew, done, truncated, info = self.env.step(new_action)
         # info["intervene_action"] = new_action     ##change this if you want to use the spacemouse action
 
