@@ -89,8 +89,8 @@ class DefaultEnvConfig:
     ABS_POSE_LIMIT_HIGH = np.zeros((6,))
     ABS_POSE_LIMIT_LOW = np.zeros((6,))
     ABS_POSE_RANGE_LIMITS = np.zeros((2,))
-    ACTION_SCALE = np.zeros((3,), dtype=np.float32)
-
+    # ACTION_SCALE = np.zeros((3,), dtype=np.float32)
+    ACTION_SCALE = np.ones((3,), dtype=np.float32)
     ROBOT_IP: str = "localhost"
     CONTROLLER_HZ: int = 0
     GRIPPER_TIMEOUT: int = 0  # in milliseconds
@@ -333,8 +333,8 @@ class UR5Env(gym.Env):
 
         gripper_action = action[6] * self.action_scale[2]
 
-        safe_pos = self.clip_safety_box(next_pos)
-        self._send_pos_command(safe_pos)
+        # safe_pos = self.clip_safety_box(next_pos)
+        self._send_pos_command(next_pos)
         self._send_gripper_command(gripper_action)
         # print(safe_pos)
         self.curr_path_length += 1

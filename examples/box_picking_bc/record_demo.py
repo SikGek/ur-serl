@@ -52,7 +52,7 @@ if __name__ == "__main__":
     env = gym.make("box_picking_basic_env",
                    camera_mode="rgb",
                    max_episode_length=1000,)
-    env = SpacemouseIntervention(env, verbose=True)  # Enable verbose input monitoring
+    env = SpacemouseIntervention(env, verbose=False)  # Enable verbose input monitoring
     env = RelativeFrame(env)
     env = Quat2MrpWrapper(env)
     env = SerlObsWrapperNoImages(env)

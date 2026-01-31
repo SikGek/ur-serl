@@ -55,7 +55,7 @@ class UR5PickingConfig(DefaultEnvConfig):
     # ABS_POSE_LIMIT_LOW = np.array([-0.65, -0.1, 0.08, -0.05, -0.05, -0.2])
     # ABS_POSE_LIMIT_HIGH = np.array([-0.0973, -0.1, -0.1, 0.259, -0.2161, 0.1])
     # ABS_POSE_LIMIT_LOW = np.array([-1.573, -0.7, 0.4, 0.9, -1.0, 0.7])
-    # ACTION_SCALE = np.array([0.01, 0.05, 1.], dtype=np.float32)
+    ACTION_SCALE = np.array([0.01, 0.05, 1.], dtype=np.float32)
 
     ROBOT_IP: str = "192.168.56.2"
 
