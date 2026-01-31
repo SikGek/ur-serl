@@ -29,7 +29,9 @@ def main(_):
     returns = 0
     
     while success_count < success_needed:
+        print("czech")
         actions = np.zeros(env.action_space.sample().shape) 
+        print(actions)
         next_obs, rew, done, truncated, info = env.step(actions)
         returns += rew
         if "intervene_action" in info:

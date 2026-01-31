@@ -277,17 +277,18 @@ class InterruptActionWrapper(gym.ActionWrapper):
         return self.env.step(action)
 
 class SpacemouseIntervention(gym.ActionWrapper):
-    def __init__(self, env, gripper_action_span=3,device_number: int = 0, verbose=True):
+    def __init__(self, env, gripper_action_span=3, verbose=True):
         super().__init__(env)
 
         self.gripper_enabled = True
 
         try:
-            self.expert = SpaceMouseExpert(device_number=device_number)
+            self.expert = SpaceMouseExpert()
+            print("Opened real SpaceMouseExpert")
         except Exception as e:
             self.expert = FakeSpaceMouseExpert(verbose)
             print(f"openend fake SpacemouseExpert since: {e}")
-
+        # input("waiting")
         self.last_intervene = 0
         self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
         self.right = self.left.copy()
@@ -368,7 +369,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
             info["hil_action"] = new_action # key for the human in the loop action
             
         info["intervene_action"] = new_action
-        
+        print(new_action)
         info["left"] = self.left.any()
         info["right"] = self.right.any()
         # print(action, new_action)

@@ -330,8 +330,8 @@ class UR5Env(gym.Env):
 
         gripper_action = action[6] * self.action_scale[2]
 
-        safe_pos = self.clip_safety_box(next_pos)
-        self._send_pos_command(safe_pos)
+        # safe_pos = self.clip_safety_box(next_pos)
+        self._send_pos_command(next_pos)
         self._send_gripper_command(gripper_action)
 
         self.curr_path_length += 1
@@ -607,7 +607,7 @@ class UR5Env(gym.Env):
             #           -.3 * np.cos(i * np.pi / 10.), 0., 0.]
             action = [-1. if i % 4 < 2 else 1, -1. if i % 4 in [1, 2] else 1, 0., 0., 0., 1., 0.]
 
-            print(action)
+            # print(action)
             obs, reward, done, truncated, _ = self.step(np.array(action))
             time.sleep(0.1)
 
