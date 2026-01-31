@@ -40,9 +40,9 @@ class EnvConfig(DefaultEnvConfig):
     RANDOM_XY_RANGE = (0.06,)
     RANDOM_ROT_RANGE = (0.0,)
     # Workspace bounds (you must tune)
-    ABS_POSE_LIMIT_HIGH = np.array([5.0, -0.9, -1.56, -1.25, 1.9, 3.45])
-    ABS_POSE_LIMIT_LOW = np.array([4.5, -1.5, -2.16, -1.85, 1.26, -3.45])
-    ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
+    # ABS_POSE_LIMIT_HIGH = np.array([5.0, -0.9, -1.56, -1.25, 1.9, 3.45])
+    # ABS_POSE_LIMIT_LOW = np.array([4.5, -1.5, -2.16, -1.85, 1.26, -3.45])
+    # ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
 
     ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
 
@@ -51,7 +51,6 @@ class EnvConfig(DefaultEnvConfig):
         "wrist": {
             "serial_number": "239122070813",   # <-- CHANGE
             "dim": (1280, 720),
-            "exposure": 10500,
         },
     }
 
