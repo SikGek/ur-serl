@@ -244,7 +244,7 @@ class UrImpedanceController(threading.Thread):
 
     def _calculate_force(self):
         target_pos = self.get_target_pos(copy=True)
-        print(target_pos)
+        # print(target_pos)
         # if target_pos[0] == 0 and target_pos[1] == 0 and target_pos[2] == 0 and target_pos[3] == 0 and target_pos[4] == 0 and target_pos[5] == 0 and target_pos[6] == 0:
         #     return np.zeros((6,))
         with self.lock:

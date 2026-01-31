@@ -297,6 +297,7 @@ class UR5Env(gym.Env):
 
     def clip_safety_box(self, next_pos: np.ndarray) -> np.ndarray:
         """Clip the pose to be within the safety box."""
+        # print(next_pos)
         next_pos[:3] = np.clip(
             next_pos[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )
@@ -318,12 +319,14 @@ class UR5Env(gym.Env):
     def step(self, action: np.ndarray) -> tuple:  # overwritten by box_placing_env.py
         """standard gym step function."""
         start_time = time.time()
+        # print(action)
         action = np.clip(action, self.action_space.low, self.action_space.high)
         # print(action)
         # position
+        # print(self.curr_pos)
         next_pos = self.curr_pos.copy()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0] # + self.trajectory_dir
-
+        print(next_pos)
         next_pos[3:] = (
                 R.from_mrp(action[3:6] * self.action_scale[1] / 4.) * R.from_quat(next_pos[3:])
         ).as_quat()             # c * r  --> applies c after r
