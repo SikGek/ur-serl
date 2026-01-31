@@ -10,7 +10,7 @@ import cv2
 from scipy.spatial.transform import Rotation as R
 
 # --- UR5 base env + camera stack (adjust imports to your repo paths) ---
-from ur_env.envs.basic_env import UR5Env  # <- change if your UR5Env lives elsewhere
+from ur_env.envs.ur5_env import UR5Env  # <- change if your UR5Env lives elsewhere
 from ur_env.camera.video_capture import VideoCapture
 from ur_env.camera.rs_capture import RSCapture
 

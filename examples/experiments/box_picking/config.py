@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 # --- UR5 base config (adjust import path) ---
-from ur_env.envs.basic_env import DefaultEnvConfig  # <- change to your repo
+from ur_env.envs.ur5_env import DefaultEnvConfig  # <- change to your repo
 
 # SERL/HIL-SERL style wrappers
 from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
