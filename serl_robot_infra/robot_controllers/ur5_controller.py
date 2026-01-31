@@ -70,7 +70,8 @@ class UrImpedanceController(threading.Thread):
         self.curr_force_lowpass = np.zeros((6,), dtype=np.float32)  # force of tool tip
         self.curr_force = np.zeros((6,), dtype=np.float32)
 
-        self.reset_Q = np.array([np.pi / 2., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.], dtype=np.float32)  # reset state in Joint Space
+        # self.reset_Q = np.array([np.pi / 2., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.], dtype=np.float32)  # reset state in Joint Space
+        self.reset_Q = np.array([271.07, -93.98, -122.14, -166.376, 270.78, 96.59])
         self.reset_Pose = np.zeros_like(self.reset_Q)
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
@@ -243,6 +244,9 @@ class UrImpedanceController(threading.Thread):
 
     def _calculate_force(self):
         target_pos = self.get_target_pos(copy=True)
+        print(target_pos)
+        # if target_pos[0] == 0 and target_pos[1] == 0 and target_pos[2] == 0 and target_pos[3] == 0 and target_pos[4] == 0 and target_pos[5] == 0 and target_pos[6] == 0:
+        #     return np.zeros((6,))
         with self.lock:
             curr_pos = self.curr_pos
             curr_vel = self.curr_vel
@@ -450,7 +454,7 @@ class UrImpedanceController(threading.Thread):
 
             # move to real home
             pi = 3.1415
-            reset_Q = np.deg2rad([272.26, -69.24, -112.58, -90.35, 89.82, 180.5])
+            reset_Q = np.deg2rad([271.07, -93.98, -122.14, -166.376, 270.78, 96.59])
             self.ur_control.moveJ(reset_Q, speed=0.5, acceleration=0.5)
 
             # terminate

@@ -4,6 +4,7 @@ from typing import Tuple
 from ur_env.envs.ur5_env import UR5Env
 from ur_env.envs.basic_env.config import UR5PickingConfig
 
+import time
 
 # used for float value comparisons (pressure of vacuum-gripper)
 def is_close(value, target):
@@ -36,3 +37,27 @@ class BoxPickingBasicEnv(UR5Env):
         # obs[0] == gripper pressure, obs[4] == force in Z-axis
         state = obs["state"]
         return 0.1 < state['gripper_state'][1] < 0.5 and state['tcp_pose'][2] > 0.25  # new min height with box
+    
+    # def step(self, action):
+    #     start_time = time.time()
+    #     gripper_action = action[6] * self.action_scale[2]
+    #     self._send_pos_command(action)
+    #     self._send_gripper_command(gripper_action)
+
+    #     self.curr_path_length += 1
+
+    #     obs = self._get_obs(action)
+
+    #     reward = self.compute_reward(obs, action)
+    #     truncated = self._is_truncated()
+    #     reward = reward if not truncated else reward - 10.  # truncation penalty
+    #     done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
+
+    #     dt = time.time() - start_time
+    #     to_sleep = max(0, (1.0 / self.hz) - dt)
+    #     # if to_sleep == 0:
+    #     #     warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
+    #     time.sleep(to_sleep)
+    #     # print(self.get_cost_infos(done)["intervene_action"])
+    #     print(action)
+    #     return obs, reward, done, truncated, self.get_cost_infos(done)
