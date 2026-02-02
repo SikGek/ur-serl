@@ -49,7 +49,7 @@ class ArucoPoseEstimator:
 
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.params) if hasattr(cv2.aruco, "ArucoDetector") else None
 
-    def estimatePoseSingleMarkers(corners, marker_size, mtx, distortion):
+    def estimatePoseSingleMarkers(self, corners, marker_size, mtx, distortion):
         '''
         This will estimate the rvec and tvec for each of the marker corners detected by:
         corners, ids, rejectedImgPoints = detector.detectMarkers(image)
@@ -71,7 +71,7 @@ class ArucoPoseEstimator:
             rvecs.append(R)
             tvecs.append(t)
             trash.append(nada)
-        return rvecs, tvecs, trash
+        return np.asarray(rvecs), np.asarray(tvecs), np.asarray(trash)
 
     def detect(self, frame: np.ndarray) -> Optional[ArucoDetection]:
         if frame is None or frame.ndim != 3:
@@ -110,8 +110,8 @@ class ArucoPoseEstimator:
             self.camera_matrix,
             self.dist_coeffs,
         )
-        rvec = np.asarray(rvecs[0, 0], dtype=np.float64).reshape(3)
-        tvec = np.asarray(tvecs[0, 0], dtype=np.float64).reshape(3)
+        rvec = np.asarray(rvecs[0], dtype=np.float64).reshape(3)
+        tvec = np.asarray(tvecs[0], dtype=np.float64).reshape(3)
 
         return ArucoDetection(
             marker_id=int(marker_id),

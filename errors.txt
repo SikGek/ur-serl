@@ -1,0 +1,40 @@
+2026-02-03 00:18:03.134600: E external/xla/xla/stream_executor/cuda/cuda_dnn.cc:522] Could not create cudnn handle: CUDNN_STATUS_INTERNAL_ERROR
+2026-02-03 00:18:03.134642: E external/xla/xla/stream_executor/cuda/cuda_dnn.cc:526] Memory usage: 33127923712 bytes free, 33680588800 bytes total.
+2026-02-03 00:18:03.134873: E external/xla/xla/stream_executor/cuda/cuda_dnn.cc:522] Could not create cudnn handle: CUDNN_STATUS_INTERNAL_ERROR
+2026-02-03 00:18:03.134897: E external/xla/xla/stream_executor/cuda/cuda_dnn.cc:526] Memory usage: 33127923712 bytes free, 33680588800 bytes total.
+jax.errors.SimplifiedTraceback: For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/ur-serl/examples/train_rlpd.py", line 17, in <module>
+    from serl_launcher.agents.continuous.sac import SACAgent
+  File "/home/user/ur-serl/serl_launcher/serl_launcher/agents/__init__.py", line 1, in <module>
+    from .continuous.bc import BCAgent
+  File "/home/user/ur-serl/serl_launcher/serl_launcher/agents/continuous/bc.py", line 12, in <module>
+    from serl_launcher.common.common import JaxRLTrainState, ModuleDict, nonpytree_field
+  File "/home/user/ur-serl/serl_launcher/serl_launcher/common/common.py", line 81, in <module>
+    class JaxRLTrainState(struct.PyTreeNode):
+  File "/home/user/ur-serl/serl_launcher/serl_launcher/common/common.py", line 226, in JaxRLTrainState
+    cls, *, apply_fn, params, txs, target_params=None, rng=jax.random.PRNGKey(0), epsilon=0.0
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/random.py", line 240, in PRNGKey
+    return _return_prng_keys(True, _key('PRNGKey', seed, impl))
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/random.py", line 202, in _key
+    return prng.random_seed(seed, impl=impl)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/prng.py", line 595, in random_seed
+    seeds_arr = jnp.asarray(np.int64(seeds))
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/numpy/lax_numpy.py", line 2233, in asarray
+    return array(a, dtype=dtype, copy=bool(copy), order=order)  # type: ignore
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/numpy/lax_numpy.py", line 2188, in array
+    out_array: Array = lax_internal._convert_element_type(
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/lax/lax.py", line 558, in _convert_element_type
+    return convert_element_type_p.bind(operand, new_dtype=new_dtype,
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/core.py", line 420, in bind
+    return self.bind_with_trace(find_top_trace(args), args, params)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/core.py", line 423, in bind_with_trace
+    out = trace.process_primitive(self, map(trace.full_raise, args), params)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/core.py", line 913, in process_primitive
+    return primitive.impl(*tracers, **params)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/dispatch.py", line 87, in apply_primitive
+    outs = fun(*args)
+jaxlib.xla_extension.XlaRuntimeError: FAILED_PRECONDITION: DNN library initialization failed. Look at the errors above for more details.
