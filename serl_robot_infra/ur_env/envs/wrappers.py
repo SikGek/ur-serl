@@ -350,7 +350,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
         # z_angle = np.arctan2(position[1], position[0])  # get first joint angle
 
         z_rot = R.from_rotvec(np.array([0, 0, -np.pi]))
-        action[:6] *= self.invert_axes  # if some want to be inverted
+        # action[:6] *= self.invert_axes  # if some want to be inverted
         action[:3] = z_rot.apply(action[:3])  # z rotation invariant translation
 
         # TODO add tcp orientation to the equation (extract z rotation from tcp pose)
