@@ -233,6 +233,7 @@ class UR5Env(gym.Env):
                 "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 "tcp_torque": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
                 "action": gym.spaces.Box(-1., 1., shape=self.action_space.shape),
+                "gripper_pose": gym.spaces.Box(-np.inf, np.inf, shape=(1,)),
                 # "boxes": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
                 # "trajectory": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
                 # "goal_pose": gym.spaces.Box(-np.inf, np.inf, shape=(6,))
@@ -340,9 +341,26 @@ class UR5Env(gym.Env):
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
+        succeed = bool(self.reached_goal_state(obs))
         reward = reward if not truncated else reward - 10.  # truncation penalty
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
 
+        if not succeed:
+            try:
+                succeed = float(reward) > 0.0
+            except Exception:
+                succeed = False
+        if truncated:
+            succeed = False
+
+        done = (
+            self.curr_path_length >= self.max_episode_length
+            or succeed
+            or truncated
+        )
+
+        info = self.get_cost_infos(done)
+        info["succeed"] = succeed
         dt = time.time() - start_time
         to_sleep = max(0, (1.0 / self.hz) - dt)
         if to_sleep == 0:
@@ -711,7 +729,7 @@ class UR5Env(gym.Env):
             "gripper_state": self.gripper_state,
             "tcp_force": self.curr_force,
             "tcp_torque": self.curr_torque,
-            "action": action
+            "gripper_pose": np.array([self.gripper_state[0]], dtype=np.float32)
         }
 
         if images is not None:
