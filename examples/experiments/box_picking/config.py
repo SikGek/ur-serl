@@ -28,7 +28,7 @@ from scipy.spatial.transform import Rotation as R
 
 class EnvConfig(DefaultEnvConfig):
     # -------- Robot / safety --------
-    ROBOT_IP: str = "192.168.56.2"      # <-- CHANGE
+    ROBOT_IP: str = "192.168.56.2"      
     CONTROLLER_HZ: int = 100
     RESET_Q = np.array([
         [271.07, -93.98, -122.14, -166.376, 270.78, 96.59],
@@ -43,13 +43,13 @@ class EnvConfig(DefaultEnvConfig):
     # ABS_POSE_LIMIT_HIGH = np.array([5.0, -0.9, -1.56, -1.25, 1.9, 3.45])
     # ABS_POSE_LIMIT_LOW = np.array([4.5, -1.5, -2.16, -1.85, 1.26, -3.45])
     # ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
-
-    ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.2, 0.2, 1.0], dtype=np.float32)
+    # ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
 
     # -------- Cameras (Franka-style dict) --------
     REALSENSE_CAMERAS = {
         "wrist": {
-            "serial_number": "239122070813",   # <-- CHANGE
+            "serial_number": "239122070813",  
             "dim": (1280, 720),
         },
     }
