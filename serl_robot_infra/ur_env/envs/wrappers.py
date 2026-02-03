@@ -276,120 +276,70 @@ class InterruptActionWrapper(gym.ActionWrapper):
     def step(self, action):
         return self.env.step(action)
 
-# class SpacemouseIntervention(gym.ActionWrapper):
-#     def __init__(self, env, gripper_action_span=3, verbose=True):
-#         super().__init__(env)
-
-#         self.gripper_enabled = True
-
-#         try:
-#             self.expert = SpaceMouseExpert()
-#             print("Opened real SpaceMouseExpert")
-#         except Exception as e:
-#             self.expert = FakeSpaceMouseExpert(verbose)
-#             print(f"openend fake SpacemouseExpert since: {e}")
-#         # input("waiting")
-#         self.last_intervene = 0
-#         self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
-#         self.right = self.left.copy()
-
-#         self.invert_axes = [1, 1, 1, 1, 1, 1]
-#         self.deadspace = 0.15
-        
-#         self.env.unwrapped.residual_learning_inference = False
-
-#     def action(self, action: np.ndarray) -> np.ndarray:
-#         """
-#         Input:
-#         - action: policy action
-#         Output:
-#         - action: spacemouse action if nonezero; else, policy action
-#         """
-#         expert_a = self.get_deadspace_action()
-#         intervened = False
-
-#         # If the SpaceMouse is moved or buttons are pressed, update the last intervention time.
-#         if np.linalg.norm(
-#                 expert_a) > 0.001 or self.left.any() or self.right.any():  # also read buttons with no movement
-#             self.last_intervene = time.time()
-#             intervened = True
-
-#         # Handle gripper action if gripper control is enabled.
-#         if self.gripper_enabled:
-#             gripper_action = np.zeros((1,)) + int(self.left.any()) - int(self.right.any())
-#             expert_a = np.concatenate((expert_a, gripper_action), axis=0)
-
-#         if time.time() - self.last_intervene < 0.5 and intervened:
-#             expert_a = self.adapt_spacemouse_output(expert_a)
-#             return expert_a, True
-
-#         return action, False
-
-#     def get_deadspace_action(self) -> np.ndarray:
-#         expert_a, buttons = self.expert.get_action()
-
-#         positive = np.clip((expert_a - self.deadspace) / (1. - self.deadspace), a_min=0.0, a_max=1.0)
-#         negative = np.clip((expert_a + self.deadspace) / (1. - self.deadspace), a_min=-1.0, a_max=0.0)
-#         expert_a = positive + negative  # remove all values in deadspace
-        
-#         self.left, self.right = np.roll(self.left, -1), np.roll(self.right, -1)  # shift them one to the left
-#         self.left[-1], self.right[-1] = tuple(buttons)  #memory of 3 elements
-
-#         return np.array(expert_a, dtype=np.float32)
-
-#     def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
-#         """
-#         Input:
-#         - expert_a: spacemouse raw output
-#         Output:
-#         - expert_a: spacemouse output adapted to force space (action)
-#         """
-
-#         # position = super().get_wrapper_attr("curr_pos")  # get position from ur_env
-#         # position = self.unwrapped.curr_pos
-#         # z_angle = np.arctan2(position[1], position[0])  # get first joint angle
-
-#         z_rot = R.from_rotvec(np.array([0, 0, -np.pi]))
-#         # action[:6] *= self.invert_axes  # if some want to be inverted
-#         action[:3] = z_rot.apply(action[:3])  # z rotation invariant translation
-
-#         # TODO add tcp orientation to the equation (extract z rotation from tcp pose)
-#         action[3:6] = z_rot.apply(action[3:6])  # z rotation invariant rotation
-
-#         return action
-
-#     def step(self, action):
-#         new_action, replaced = self.action(action)
-#         # print(f"new action: {new_action}")
-#         obs, rew, done, truncated, info = self.env.step(new_action)
-#         # info["intervene_action"] = new_action     ##change this if you want to use the spacemouse action
-
-#         # Add additional information to the info dictionary about the intervention.
-#         if replaced:
-#             info["hil_action"] = new_action # key for the human in the loop action
-            
-#         info["intervene_action"] = new_action
-#         print(new_action)
-#         info["left"] = self.left.any()
-#         info["right"] = self.right.any()
-#         # print(action, new_action)
-#         # Return the observation, reward, done flag, truncation flag, and info dictionary.
-#         return obs, rew, done, truncated, info
-
 class SpacemouseIntervention(gym.ActionWrapper):
     def __init__(self, env, gripper_action_span=3, verbose=True):
         super().__init__(env)
-        ...
-        # Choose teleop frame
+
+        self.gripper_enabled = True
+
+        try:
+            self.expert = SpaceMouseExpert()
+            print("Opened real SpaceMouseExpert")
+        except Exception as e:
+            self.expert = FakeSpaceMouseExpert(verbose)
+            print(f"openend fake SpacemouseExpert since: {e}")
+        # input("waiting")
+        self.last_intervene = 0
+        self.left = np.array([False] * gripper_action_span, dtype=np.bool_)
+        self.right = self.left.copy()
+
+        self.invert_axes = [1, 1, 1, 1, 1, 1]
+        self.deadspace = 0.15
         self.teleop_frame = "tcp"   # "tcp" or "base"
 
         # Optional constant alignment from SpaceMouse axes -> TCP axes at your “neutral” pose.
         # Start with identity. If it feels rotated/flipped, tune this OR invert_axes.
         self.R_sm_to_tcp = R.identity()
+        self.env.unwrapped.residual_learning_inference = False
 
-        # Keep your old z flip as an optional alignment if you still want it:
-        # self.R_sm_to_tcp = R.from_rotvec([0, 0, -np.pi])
-        ...
+    def action(self, action: np.ndarray) -> np.ndarray:
+        """
+        Input:
+        - action: policy action
+        Output:
+        - action: spacemouse action if nonezero; else, policy action
+        """
+        expert_a = self.get_deadspace_action()
+        intervened = False
+
+        # If the SpaceMouse is moved or buttons are pressed, update the last intervention time.
+        if np.linalg.norm(
+                expert_a) > 0.001 or self.left.any() or self.right.any():  # also read buttons with no movement
+            self.last_intervene = time.time()
+            intervened = True
+
+        # Handle gripper action if gripper control is enabled.
+        if self.gripper_enabled:
+            gripper_action = np.zeros((1,)) + int(self.left.any()) - int(self.right.any())
+            expert_a = np.concatenate((expert_a, gripper_action), axis=0)
+
+        if time.time() - self.last_intervene < 0.5 and intervened:
+            expert_a = self.adapt_spacemouse_output(expert_a)
+            return expert_a, True
+
+        return action, False
+
+    def get_deadspace_action(self) -> np.ndarray:
+        expert_a, buttons = self.expert.get_action()
+
+        positive = np.clip((expert_a - self.deadspace) / (1. - self.deadspace), a_min=0.0, a_max=1.0)
+        negative = np.clip((expert_a + self.deadspace) / (1. - self.deadspace), a_min=-1.0, a_max=0.0)
+        expert_a = positive + negative  # remove all values in deadspace
+        
+        self.left, self.right = np.roll(self.left, -1), np.roll(self.right, -1)  # shift them one to the left
+        self.left[-1], self.right[-1] = tuple(buttons)  #memory of 3 elements
+
+        return np.array(expert_a, dtype=np.float32)
 
     def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
         """
@@ -448,6 +398,97 @@ class SpacemouseIntervention(gym.ActionWrapper):
         a_out[6]    = a_tcp[6]  # gripper stays as-is
 
         return np.clip(a_out, -1.0, 1.0).astype(np.float32)
+
+    def step(self, action):
+        new_action, replaced = self.action(action)
+        # print(f"new action: {new_action}")
+        obs, rew, done, truncated, info = self.env.step(new_action)
+        # info["intervene_action"] = new_action     ##change this if you want to use the spacemouse action
+
+        # Add additional information to the info dictionary about the intervention.
+        if replaced:
+            info["hil_action"] = new_action # key for the human in the loop action
+            
+        info["intervene_action"] = new_action
+        print(new_action)
+        info["left"] = self.left.any()
+        info["right"] = self.right.any()
+        # print(action, new_action)
+        # Return the observation, reward, done flag, truncation flag, and info dictionary.
+        return obs, rew, done, truncated, info
+
+# class SpacemouseIntervention(gym.ActionWrapper):
+#     def __init__(self, env, gripper_action_span=3, verbose=True):
+#         super().__init__(env)
+#         ...
+#         # Choose teleop frame
+#         self.teleop_frame = "tcp"   # "tcp" or "base"
+
+#         # Optional constant alignment from SpaceMouse axes -> TCP axes at your “neutral” pose.
+#         # Start with identity. If it feels rotated/flipped, tune this OR invert_axes.
+#         self.R_sm_to_tcp = R.identity()
+
+#         # Keep your old z flip as an optional alignment if you still want it:
+#         # self.R_sm_to_tcp = R.from_rotvec([0, 0, -np.pi])
+#         ...
+
+#     def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
+#         """
+#         Convert SpaceMouse action into the env's expected action, but with TCP-frame behavior.
+#         action shape: (7,) -> [dx,dy,dz, d_rx,d_ry,d_rz, gripper]
+#         """
+#         env = self.env.unwrapped  # base UR5 env
+#         a = np.asarray(action, dtype=np.float32).copy()
+
+#         # Apply any per-axis inversion first (your existing tuning knob)
+#         a[:6] *= np.asarray(self.invert_axes, dtype=np.float32)
+
+#         # 1) Interpret SpaceMouse as a command in TCP/body frame (after your constant alignment)
+#         a_tcp = a.copy()
+#         a_tcp[:3]  = self.R_sm_to_tcp.apply(a[:3])
+#         a_tcp[3:6] = self.R_sm_to_tcp.apply(a[3:6])
+
+#         if self.teleop_frame != "tcp":
+#             # Old behavior (base-frame)
+#             return np.clip(a_tcp, -1.0, 1.0).astype(np.float32)
+
+#         # 2) Fetch current TCP orientation (quat) from env state
+#         # Assumes env.curr_pos = [x,y,z,qx,qy,qz,qw] and quat is TCP->base
+#         try:
+#             q = np.asarray(env.curr_pos[3:], dtype=np.float64)
+#         except Exception:
+#             # fallback if needed
+#             q = np.asarray(env.controller.get_state()["pos"][3:], dtype=np.float64)
+
+#         R_bt = R.from_quat(q)  # rotation TCP -> base
+
+#         # 3) Convert translational command: TCP -> base
+#         # env does: p_next = p + (action[:3] * action_scale[0])
+#         pos_scale = float(env.action_scale[0])
+#         dp_tcp_m   = a_tcp[:3] * pos_scale
+#         dp_base_m  = R_bt.apply(dp_tcp_m)
+#         a_base_pos = dp_base_m / pos_scale
+
+#         # 4) Convert rotational command: TCP/body increment -> base/space increment
+#         # env does: R_next = R_delta_base * R_current, where
+#         #           R_delta_base = from_mrp(action[3:6] * rot_scale)
+#         rot_scale = float(env.action_scale[1]) / 4.0  # matches your env's from_mrp(... /4)
+#         sigma_tcp = a_tcp[3:6] * rot_scale
+
+#         # Build delta rotation in TCP frame
+#         R_delta_tcp = R.from_mrp(sigma_tcp)
+
+#         # Conjugate to get the equivalent base/space delta
+#         R_delta_base = R_bt * R_delta_tcp * R_bt.inv()
+#         sigma_base   = R_delta_base.as_mrp()
+#         a_base_rot   = sigma_base / rot_scale
+
+#         a_out = np.zeros_like(a_tcp)
+#         a_out[:3]   = a_base_pos
+#         a_out[3:6]  = a_base_rot
+#         a_out[6]    = a_tcp[6]  # gripper stays as-is
+
+#         return np.clip(a_out, -1.0, 1.0).astype(np.float32)
 
 
 class Quat2EulerWrapper(gym.ObservationWrapper):  # not used anymore (stay away from euler angles!)

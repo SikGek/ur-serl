@@ -71,7 +71,7 @@ class UrImpedanceController(threading.Thread):
         self.curr_force = np.zeros((6,), dtype=np.float32)
 
         # self.reset_Q = np.array([np.pi / 2., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.], dtype=np.float32)  # reset state in Joint Space
-        self.reset_Q = np.array([271.07, -93.98, -122.14, -166.376, 270.78, 96.59])
+        self.reset_Q = np.array([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
         self.reset_Pose = np.zeros_like(self.reset_Q)
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
@@ -454,7 +454,7 @@ class UrImpedanceController(threading.Thread):
 
             # move to real home
             pi = 3.1415
-            reset_Q = np.deg2rad([271.07, -93.98, -122.14, -166.376, 270.78, 96.59])
+            reset_Q = np.deg2rad([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
             self.ur_control.moveJ(reset_Q, speed=0.5, acceleration=0.5)
 
             # terminate

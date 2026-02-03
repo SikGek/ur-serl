@@ -457,6 +457,7 @@ def main(_):
 
         assert FLAGS.demo_path is not None
         for path in FLAGS.demo_path:
+            print("Demo path is: ", path, "Current working directory is: ", os.getcwd())
             with open(path, "rb") as f:
                 transitions = pkl.load(f)
                 for transition in transitions:
@@ -522,4 +523,5 @@ def main(_):
 
 
 if __name__ == "__main__":
+    print(os.getcwd())
     app.run(main)

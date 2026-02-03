@@ -115,9 +115,9 @@ class UR5Env(gym.Env):
             hz: int = 10,
             fake_env=False,
             config=DefaultEnvConfig,
-            max_episode_length: int = 200,
+            max_episode_length: int = 200000,
             save_video: bool = False,
-            camera_mode: str = "none",  # one of (rgb, grey, depth, both(rgb depth), pointcloud, none)
+            camera_mode: str = "rgb",  # one of (rgb, grey, depth, both(rgb depth), pointcloud, none)
     ):
         self.max_episode_length = max_episode_length
         self.curr_path_length = 0
@@ -343,6 +343,7 @@ class UR5Env(gym.Env):
         truncated = self._is_truncated()
         succeed = bool(self.reached_goal_state(obs))
         reward = reward if not truncated else reward - 10.  # truncation penalty
+        print([self.curr_path_length, self.max_episode_length, self.reached_goal_state(obs), truncated])
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
 
         if not succeed:
@@ -366,7 +367,7 @@ class UR5Env(gym.Env):
         if to_sleep == 0:
             warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
         time.sleep(to_sleep)
-
+        # done = False
         return obs, reward, done, truncated, info
 
     def compute_reward(self, obs, action) -> float:

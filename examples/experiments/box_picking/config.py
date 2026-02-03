@@ -31,7 +31,7 @@ class EnvConfig(DefaultEnvConfig):
     ROBOT_IP: str = "192.168.56.2"      
     CONTROLLER_HZ: int = 100
     RESET_Q = np.array([
-        [271.07, -93.98, -122.14, -166.376, 270.78, 96.59],
+        [271.07, -93.98, -122.14, -166.376, 270.78, 180.0],
         # [-5, -78.62, 122.84, -134.22, -89.81, -13.03],
         # [10, -75.62, 122.84, -134.22, -89.81, -13.03],
     ])
@@ -43,13 +43,13 @@ class EnvConfig(DefaultEnvConfig):
     # ABS_POSE_LIMIT_HIGH = np.array([5.0, -0.9, -1.56, -1.25, 1.9, 3.45])
     # ABS_POSE_LIMIT_LOW = np.array([4.5, -1.5, -2.16, -1.85, 1.26, -3.45])
     # ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
-    ACTION_SCALE = np.array([0.2, 0.2, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.1, 0.1, 1.0], dtype=np.float32)
     # ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
 
     # -------- Cameras (Franka-style dict) --------
     REALSENSE_CAMERAS = {
         "wrist": {
-            "serial_number": "239122070813",  
+            "serial_number": "218622274722",  
             "dim": (1280, 720),
         },
     }
@@ -77,11 +77,11 @@ class EnvConfig(DefaultEnvConfig):
 
     # Hand-eye: TCP -> camera
     T_TCP_CAM = np.array([
-        [1, 0, 0, 0.00],
-        [0, 1, 0, 0.05],
-        [0, 0, 1, 0.10],
-        [0, 0, 0, 1.00],
-    ], dtype=np.float64)
+    [-0.99987673, -0.01533774, -0.00336024, -0.19441016],
+    [0.00317622, 0.01200614, -0.99992288, 0.46531429],
+    [0.01537690, -0.99981028, -0.01195594, 0.72345337],
+    [0.00000000, 0.00000000, 0.00000000, 1.00000000]
+])
 
     # Marker origin -> box center offset in marker frame
     MARKER_TO_BOX_CENTER = np.array([0.0, 0.0, -0.02], dtype=np.float64)
@@ -96,7 +96,7 @@ class EnvConfig(DefaultEnvConfig):
     WAIT_FOR_MARKER_ON_RESET = True
     MARKER_RESET_TIMEOUT_S = 3.0
 
-    MAX_EPISODE_LENGTH = 150
+    MAX_EPISODE_LENGTH = 1000
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
