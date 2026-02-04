@@ -27,6 +27,8 @@ from experiments.box_picking.wrapper import (
 )
 from scipy.spatial.transform import Rotation as R
 
+import pyrealsense2 as rs
+
 class EnvConfig(DefaultEnvConfig):
     # -------- Robot / safety --------
     ROBOT_IP: str = "192.168.56.2"      
@@ -40,12 +42,13 @@ class EnvConfig(DefaultEnvConfig):
     RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.06,)
     RANDOM_ROT_RANGE = (0.0,)
+    p0 = [-0.1274, -0.4032, 0.2258]
     # Workspace bounds (you must tune)
-    # ABS_POSE_LIMIT_HIGH = np.array([5.0, -0.9, -1.56, -1.25, 1.9, 3.45])
-    # ABS_POSE_LIMIT_LOW = np.array([4.5, -1.5, -2.16, -1.85, 1.26, -3.45])
+    ABS_POSE_LIMIT_LOW = np.array([p0[0]-0.20, p0[1]-0.20, p0[2]-0.15, -0.08, -0.08, -0.15])
+    ABS_POSE_LIMIT_HIGH = np.array([p0[0]+0.20, p0[1]+0.20, p0[2]+0.10, 0.08, 0.08, 0.15])
     # ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
-    # ACTION_SCALE = np.array([0.1, 0.1, 1.0], dtype=np.float32)
-    ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.07, 0.1, 1.0], dtype=np.float32)
+    # ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
 
     # -------- Cameras (Franka-style dict) --------
     REALSENSE_CAMERAS = {
@@ -56,9 +59,9 @@ class EnvConfig(DefaultEnvConfig):
     }
 
     # Optional: per-camera crop functions
-    IMAGE_CROP = {
-        "wrist": lambda img: img[:, 124:604, :],
-    }
+    # IMAGE_CROP = {
+    #     "wrist": lambda img: img[:, 124:604, :],
+    # }
 
     # Which camera to use for ArUco detection
     DETECT_CAMERA = "wrist"
@@ -147,7 +150,7 @@ class TrainConfig(DefaultTrainingConfig):
     use_reward_classifier = True
     classifier_ckpt_path = os.path.abspath("classifier_ckpt/")
 
-    def get_environment(self, fake_env=False, save_video=False, classifier=False):
+    def get_environment(self, fake_env=False, save_video=False, classifier=True):
         # Base env
         env = UR5EArucoPickEnv(
             fake_env=fake_env,

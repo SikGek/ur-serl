@@ -158,7 +158,9 @@ def main(_):
     env = config.get_environment(fake_env=False, save_video=False, classifier=False)
 
     obs, _ = env.reset()
-
+    # print(env.unwrapped.curr_reset_pose)
+    # print(env.unwrapped.curr_reset_pose[:3])
+    # exit()
     successes = []
     failures = []
     pending = deque()  # transitions not yet committed to success/failure
