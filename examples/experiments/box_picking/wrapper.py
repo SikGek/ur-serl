@@ -20,7 +20,7 @@ from ur_env.utils.transforms import (
     construct_homogeneous_matrix_from_rvec_tvec,
     transform_point,
 )
-
+import jax
 
 class UR5EArucoPickEnv(UR5Env):
     """
