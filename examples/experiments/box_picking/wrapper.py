@@ -378,6 +378,57 @@ class GripperPenaltyWrapper(gym.Wrapper):
         return obs, reward, term, trunc, info
 
 
+# class RewardClassifierTerminateWrapper(gym.Wrapper):
+#     """
+#     Turns a learned classifier into:
+#       - binary reward (0/1)
+#       - episode termination on success
+#       - info["succeed"]=True on success
+
+#     Also supports K-frame hysteresis to avoid one-frame false positives.
+#     """
+#     def __init__(self, env, prob_func, threshold=0.7, consecutive=3):
+#         super().__init__(env)
+#         self.prob_func = prob_func          # returns probability in [0,1]
+#         self.threshold = float(threshold)
+#         self.consecutive = int(consecutive)
+#         self._streak = 0
+
+#     def reset(self, **kwargs):
+#         obs, info = self.env.reset(**kwargs)
+#         self._streak = 0
+#         return obs, info
+
+#     def step(self, action):
+#         obs, _env_reward, terminated, truncated, info = self.env.step(action)
+
+#         # Probability in [0,1]
+#         p = float(self.prob_func(obs))
+#         is_pos = (p >= self.threshold)
+
+#         # K-frame hysteresis
+#         if is_pos:
+#             self._streak += 1
+#         else:
+#             self._streak = 0
+
+#         success = (self._streak >= self.consecutive)
+
+#         # Binary reward (HIL-SERL style)
+#         reward = 1.0 if success else 0.0
+
+#         # If success, end episode (unless already safety-truncated)
+#         if success and not truncated:
+#             terminated = True
+#             info["succeed"] = True
+
+#         # Useful debug signals
+#         info["reward_clf_prob"] = p
+#         info["reward_clf_pos"] = bool(is_pos)
+#         info["reward_clf_success"] = bool(success)
+
+#         return obs, reward, terminated, truncated, info
+    
 class RewardClassifierTerminateWrapper(gym.Wrapper):
     """
     Turns a learned classifier into:
@@ -397,30 +448,48 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
         self._streak = 0
+        info["succeed"] = False
+        info["reward_clf_prob"] = 0.0
+        info["reward_clf_pos"] = False
+        info["reward_clf_success"] = False
         return obs, info
+
+    def _to_float_scalar(self, x) -> float:
+        """Robust scalar conversion for JAX/NumPy/python values."""
+        x_host = jax.device_get(x)  # safe even if x is already numpy/python
+        arr = np.asarray(x_host).reshape(-1)
+        return float(arr[0])
 
     def step(self, action):
         obs, _env_reward, terminated, truncated, info = self.env.step(action)
 
         # Probability in [0,1]
-        p = float(self.prob_func(obs))
+        p_raw = self.prob_func(obs)
+        p = self._to_float_scalar(p_raw)
+        p = float(np.clip(p, 0.0, 1.0))  # just safety
+
         is_pos = (p >= self.threshold)
 
-        # K-frame hysteresis
-        if is_pos:
-            self._streak += 1
-        else:
+        # If safety-truncated, do NOT allow classifier to declare success
+        if truncated:
             self._streak = 0
+            success = False
+            reward = 0.0
+        else:
+            # K-frame hysteresis
+            if is_pos:
+                self._streak += 1
+            else:
+                self._streak = 0
 
-        success = (self._streak >= self.consecutive)
+            success = (self._streak >= self.consecutive)
+            reward = 1.0 if success else 0.0
 
-        # Binary reward (HIL-SERL style)
-        reward = 1.0 if success else 0.0
+            if success:
+                terminated = True
 
-        # If success, end episode (unless already safety-truncated)
-        if success and not truncated:
-            terminated = True
-            info["succeed"] = True
+        # Always populate succeed flag (prevents downstream KeyErrors)
+        info["succeed"] = bool(success)
 
         # Useful debug signals
         info["reward_clf_prob"] = p

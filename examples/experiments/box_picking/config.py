@@ -187,9 +187,18 @@ class TrainConfig(DefaultTrainingConfig):
             )
 
             def reward_func(obs):
-                sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
-                print(obs)
-                return int(sigmoid(clf(obs)) > 0.7)
+                # sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
+                # print(obs)
+                # return int(sigmoid(clf(obs)) > 0.7)
+                logits = clf(obs)
+                logits = jnp.asarray(logits)
+                logit0 = jnp.ravel(logits)[0]          # force scalar
+
+                # convert logits -> probability
+                p = jax.nn.sigmoid(logit0)
+
+                # return python float
+                return float(jax.device_get(p))
 
             env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.7, consecutive=3)
 
