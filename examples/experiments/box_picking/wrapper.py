@@ -295,22 +295,54 @@ class Quat2EulerWrapper(gym.Wrapper):
         return self.observation(obs), r, term, trunc, info
 
 
+# class MultiCameraBinaryRewardClassifierWrapper(gym.Wrapper):
+#     """
+#     Optional HIL-SERL-style sparse reward from a learned binary classifier.
+#     (HIL-SERL uses a binary reward classifier + demos + interventions). :contentReference[oaicite:5]{index=5}
+#     """
+#     def __init__(self, env, reward_func):
+#         super().__init__(env)
+#         self.reward_func = reward_func
+
+#     def reset(self, **kwargs):
+#         return self.env.reset(**kwargs)
+
+#     def step(self, action):
+#         obs, reward, term, trunc, info = self.env.step(action)
+#         reward = float(self.reward_func(obs))
+#         return obs, reward, term, trunc, info
+
 class MultiCameraBinaryRewardClassifierWrapper(gym.Wrapper):
     """
-    Optional HIL-SERL-style sparse reward from a learned binary classifier.
-    (HIL-SERL uses a binary reward classifier + demos + interventions). :contentReference[oaicite:5]{index=5}
+    This wrapper uses the camera images to compute the reward,
+    which is not part of the observation space
     """
-    def __init__(self, env, reward_func):
-        super().__init__(env)
-        self.reward_func = reward_func
 
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
+    def __init__(self, env: Env, reward_classifier_func, target_hz = None):
+        super().__init__(env)
+        self.reward_classifier_func = reward_classifier_func
+        self.target_hz = target_hz
+
+    def compute_reward(self, obs):
+        if self.reward_classifier_func is not None:
+            return self.reward_classifier_func(obs)
+        return 0
 
     def step(self, action):
-        obs, reward, term, trunc, info = self.env.step(action)
-        reward = float(self.reward_func(obs))
-        return obs, reward, term, trunc, info
+        start_time = time.time()
+        obs, rew, done, truncated, info = self.env.step(action)
+        rew = self.compute_reward(obs)
+        done = done or rew
+        info['succeed'] = bool(rew)
+        if self.target_hz is not None:
+            time.sleep(max(0, 1/self.target_hz - (time.time() - start_time)))
+            
+        return obs, rew, done, truncated, info
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        info['succeed'] = False
+        return obs, info
 
 
 class GripperPenaltyWrapper(gym.Wrapper):
@@ -344,3 +376,55 @@ class GripperPenaltyWrapper(gym.Wrapper):
         info["grasp_penalty"] = self.penalty if toggling else 0.0
         self.last_closed_norm = closed_norm
         return obs, reward, term, trunc, info
+
+
+class RewardClassifierTerminateWrapper(gym.Wrapper):
+    """
+    Turns a learned classifier into:
+      - binary reward (0/1)
+      - episode termination on success
+      - info["succeed"]=True on success
+
+    Also supports K-frame hysteresis to avoid one-frame false positives.
+    """
+    def __init__(self, env, prob_func, threshold=0.7, consecutive=3):
+        super().__init__(env)
+        self.prob_func = prob_func          # returns probability in [0,1]
+        self.threshold = float(threshold)
+        self.consecutive = int(consecutive)
+        self._streak = 0
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        self._streak = 0
+        return obs, info
+
+    def step(self, action):
+        obs, _env_reward, terminated, truncated, info = self.env.step(action)
+
+        # Probability in [0,1]
+        p = float(self.prob_func(obs))
+        is_pos = (p >= self.threshold)
+
+        # K-frame hysteresis
+        if is_pos:
+            self._streak += 1
+        else:
+            self._streak = 0
+
+        success = (self._streak >= self.consecutive)
+
+        # Binary reward (HIL-SERL style)
+        reward = 1.0 if success else 0.0
+
+        # If success, end episode (unless already safety-truncated)
+        if success and not truncated:
+            terminated = True
+            info["succeed"] = True
+
+        # Useful debug signals
+        info["reward_clf_prob"] = p
+        info["reward_clf_pos"] = bool(is_pos)
+        info["reward_clf_success"] = bool(success)
+
+        return obs, reward, terminated, truncated, info

@@ -23,6 +23,7 @@ from experiments.box_picking.wrapper import (
     Quat2EulerWrapper,
     MultiCameraBinaryRewardClassifierWrapper,
     GripperPenaltyWrapper,
+    RewardClassifierTerminateWrapper,
 )
 from scipy.spatial.transform import Rotation as R
 
@@ -143,7 +144,7 @@ class TrainConfig(DefaultTrainingConfig):
     setup_mode = "single-arm-learned-gripper"
 
     # Optional: enable a learned reward classifier (HIL-SERL style)
-    use_reward_classifier = False
+    use_reward_classifier = True
     classifier_ckpt_path = os.path.abspath("classifier_ckpt/")
 
     def get_environment(self, fake_env=False, save_video=False, classifier=False):
@@ -186,7 +187,7 @@ class TrainConfig(DefaultTrainingConfig):
                 sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
                 return int(sigmoid(clf(obs)) > 0.7)
 
-            env = MultiCameraBinaryRewardClassifierWrapper(env, reward_func)
+            env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.7, consecutive=3)
 
         # Gripper penalty support for hybrid agent
         env = GripperPenaltyWrapper(env, penalty=-0.02)

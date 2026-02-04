@@ -253,7 +253,7 @@ class UR5Env(gym.Env):
         self.cap = None
 
         if fake_env:
-            print("[UR5Env] is fake!")
+            print("[UR5Env] is fake!", fake_env)
             return
 
         self.controller = UrImpedanceController(
@@ -331,8 +331,8 @@ class UR5Env(gym.Env):
 
         gripper_action = action[6] * self.action_scale[2]
 
-        # safe_pos = self.clip_safety_box(next_pos)
-        self._send_pos_command(next_pos)
+        safe_pos = self.clip_safety_box(next_pos)
+        self._send_pos_command(safe_pos)
         self._send_gripper_command(gripper_action)
 
         self.curr_path_length += 1
