@@ -188,6 +188,7 @@ class TrainConfig(DefaultTrainingConfig):
 
             def reward_func(obs):
                 sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
+                print(obs)
                 return int(sigmoid(clf(obs)) > 0.7)
 
             env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.7, consecutive=3)

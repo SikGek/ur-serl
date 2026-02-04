@@ -38,3 +38,26 @@ Traceback (most recent call last):
   File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/dispatch.py", line 87, in apply_primitive
     outs = fun(*args)
 jaxlib.xla_extension.XlaRuntimeError: FAILED_PRECONDITION: DNN library initialization failed. Look at the errors above for more details.
+
+
+ File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/absl/app.py", line 367, in run
+    _run_main(main, args)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/absl/app.py", line 312, in _run_main
+    sys.exit(main(argv))
+  File "/home/user/ur-serl/examples/experiments/box_picking/../../train_rlpd.py", line 513, in main
+    actor(
+  File "/home/user/ur-serl/examples/experiments/box_picking/../../train_rlpd.py", line 171, in actor
+    next_obs, reward, done, truncated, info = env.step(actions)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/gymnasium/wrappers/record_episode_statistics.py", line 89, in step
+    ) = self.env.step(action)
+  File "/home/user/ur-serl/examples/experiments/box_picking/wrapper.py", line 364, in step
+    obs, reward, term, trunc, info = self.env.step(action)
+  File "/home/user/ur-serl/examples/experiments/box_picking/wrapper.py", line 406, in step
+    p = float(self.prob_func(obs))
+  File "/home/user/ur-serl/examples/experiments/box_picking/config.py", line 191, in reward_func
+    return int(sigmoid(clf(obs)) > 0.7)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/array.py", line 277, in __int__
+    core.check_scalar_conversion(self)
+  File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/core.py", line 642, in check_scalar_conversion
+    raise TypeError("Only scalar arrays can be converted to Python scalars; "
+TypeError: Only scalar arrays can be converted to Python scalars; got arr.ndim=1
