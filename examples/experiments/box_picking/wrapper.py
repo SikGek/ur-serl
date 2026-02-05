@@ -184,35 +184,35 @@ class UR5EArucoPickEnv(UR5Env):
             return False
         return float(self.curr_pos[2]) > float(self._box_center_base[2] + self.task_cfg.LIFT_DELTA_Z)
 
-    def compute_reward(self, obs, action) -> float:
-        # Update from ArUco each step if possible
-        if not self._update_box_from_aruco():
-            return -0.01
+    # def compute_reward(self, obs, action) -> float:
+    #     # Update from ArUco each step if possible
+    #     if not self._update_box_from_aruco():
+    #         return -0.01
 
-        if self.reached_goal_state(obs):
-            return 1.0  # IMPORTANT: your eval code treats reward as success
+    #     if self.reached_goal_state(obs):
+    #         return 1.0  # IMPORTANT: your eval code treats reward as success
 
-        tcp = np.asarray(self.curr_pos[:3], dtype=np.float32)
-        pre = self._pregrasp_xyz()
-        grasp = self._grasp_xyz()
-        if pre is None or grasp is None:
-            return -0.01
+    #     tcp = np.asarray(self.curr_pos[:3], dtype=np.float32)
+    #     pre = self._pregrasp_xyz()
+    #     grasp = self._grasp_xyz()
+    #     if pre is None or grasp is None:
+    #         return -0.01
 
-        d_pre = float(np.linalg.norm(tcp - pre))
-        d_grasp = float(np.linalg.norm(tcp - grasp))
+    #     d_pre = float(np.linalg.norm(tcp - pre))
+    #     d_grasp = float(np.linalg.norm(tcp - grasp))
 
-        shaped = -0.05 * d_pre - 0.10 * d_grasp
+    #     shaped = -0.05 * d_pre - 0.10 * d_grasp
 
-        # small bonus for "closing near grasp"
-        if float(np.linalg.norm((tcp - grasp)[:2])) < float(self.task_cfg.GRASP_XY_TOL):
-            if abs(float(tcp[2] - grasp[2])) < float(self.task_cfg.GRASP_Z_TOL):
-                if action is not None and float(action[-1]) > 0.5:
-                    shaped += 0.05
+    #     # small bonus for "closing near grasp"
+    #     if float(np.linalg.norm((tcp - grasp)[:2])) < float(self.task_cfg.GRASP_XY_TOL):
+    #         if abs(float(tcp[2] - grasp[2])) < float(self.task_cfg.GRASP_Z_TOL):
+    #             if action is not None and float(action[-1]) > 0.5:
+    #                 shaped += 0.05
 
-        if bool(self.gripper_state[1] > 0.5):
-            shaped += 0.10
+    #     if bool(self.gripper_state[1] > 0.5):
+    #         shaped += 0.10
 
-        return float(shaped)
+    #     return float(shaped)
 
     # ---------- observation ----------
     def _get_obs(self, action) -> dict:
@@ -312,37 +312,37 @@ class Quat2EulerWrapper(gym.Wrapper):
 #         reward = float(self.reward_func(obs))
 #         return obs, reward, term, trunc, info
 
-class MultiCameraBinaryRewardClassifierWrapper(gym.Wrapper):
-    """
-    This wrapper uses the camera images to compute the reward,
-    which is not part of the observation space
-    """
+# class MultiCameraBinaryRewardClassifierWrapper(gym.Wrapper):
+#     """
+#     This wrapper uses the camera images to compute the reward,
+#     which is not part of the observation space
+#     """
 
-    def __init__(self, env: Env, reward_classifier_func, target_hz = None):
-        super().__init__(env)
-        self.reward_classifier_func = reward_classifier_func
-        self.target_hz = target_hz
+#     def __init__(self, env: Env, reward_classifier_func, target_hz = None):
+#         super().__init__(env)
+#         self.reward_classifier_func = reward_classifier_func
+#         self.target_hz = target_hz
 
-    def compute_reward(self, obs):
-        if self.reward_classifier_func is not None:
-            return self.reward_classifier_func(obs)
-        return 0
+#     def compute_reward(self, obs):
+#         if self.reward_classifier_func is not None:
+#             return self.reward_classifier_func(obs)
+#         return 0
 
-    def step(self, action):
-        start_time = time.time()
-        obs, rew, done, truncated, info = self.env.step(action)
-        rew = self.compute_reward(obs)
-        done = done or rew
-        info['succeed'] = bool(rew)
-        if self.target_hz is not None:
-            time.sleep(max(0, 1/self.target_hz - (time.time() - start_time)))
+#     def step(self, action):
+#         start_time = time.time()
+#         obs, rew, done, truncated, info = self.env.step(action)
+#         rew = self.compute_reward(obs)
+#         done = done or rew
+#         info['succeed'] = bool(rew)
+#         if self.target_hz is not None:
+#             time.sleep(max(0, 1/self.target_hz - (time.time() - start_time)))
             
-        return obs, rew, done, truncated, info
+#         return obs, rew, done, truncated, info
 
-    def reset(self, **kwargs):
-        obs, info = self.env.reset(**kwargs)
-        info['succeed'] = False
-        return obs, info
+#     def reset(self, **kwargs):
+#         obs, info = self.env.reset(**kwargs)
+#         info['succeed'] = False
+#         return obs, info
 
 
 class GripperPenaltyWrapper(gym.Wrapper):

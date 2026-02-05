@@ -41,7 +41,7 @@ class ImageDisplayer(threading.Thread):
                 [v for k, v in img_array.items() if "full" not in k], axis=0
             )
             cv2.namedWindow("RealSense Cameras", cv2.WINDOW_NORMAL)
-            cv2.resizeWindow("RealSense Cameras", 300, 700)
+            # cv2.resizeWindow("RealSense Cameras", 300, 700)
             cv2.imshow("RealSense Cameras", frame)
             cv2.waitKey(1)
 
@@ -346,11 +346,11 @@ class UR5Env(gym.Env):
         print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
 
-        if not succeed:
-            try:
-                succeed = float(reward) > 0.0
-            except Exception:
-                succeed = False
+        # if not succeed:
+        #     try:
+        #         succeed = float(reward) > 0.0
+        #     except Exception:
+        #         succeed = False
         if truncated:
             succeed = False
 
@@ -529,13 +529,18 @@ class UR5Env(gym.Env):
             self.cap[cam_name] = cap
 
     def crop_image(self, name, image) -> np.ndarray:
-        """Crop realsense images to be a square."""
-        if name == "wrist":
-            return image[:, 124:604, :]
-        elif name == "wrist_2":
-            return image[:, 124:604, :]
-        else:
-            raise ValueError(f"Camera {name} not recognized in cropping")
+        """
+        Center-crop to a square using the min(image height, image width).
+        Works for 848x480 (D405 common), 1280x720, etc.
+        """
+        h, w = image.shape[:2]
+        s = min(h, w)  # square size
+
+        y0 = (h - s) // 2
+        x0 = (w - s) // 2
+
+        return image[y0:y0 + s, x0:x0 + s, ...]
+
 
     def get_image(self) -> Dict[str, np.ndarray]:
         """Get images from the realsense cameras."""
