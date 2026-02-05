@@ -21,7 +21,6 @@ from experiments.config import DefaultTrainingConfig      # your training base
 from experiments.box_picking.wrapper import (
     UR5EArucoPickEnv,
     Quat2EulerWrapper,
-    MultiCameraBinaryRewardClassifierWrapper,
     GripperPenaltyWrapper,
     RewardClassifierTerminateWrapper,
 )
@@ -100,7 +99,7 @@ class EnvConfig(DefaultEnvConfig):
     WAIT_FOR_MARKER_ON_RESET = True
     MARKER_RESET_TIMEOUT_S = 3.0
 
-    MAX_EPISODE_LENGTH = 500
+    MAX_EPISODE_LENGTH = 150
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
@@ -144,7 +143,7 @@ class TrainConfig(DefaultTrainingConfig):
     checkpoint_period = 2000
 
     # Choose learned-gripper mode if you want SAC hybrid + grasp_penalty
-    setup_mode = "single-arm-learned-gripper"
+    setup_mode = 'single-arm-learned-gripper'
 
     # Optional: enable a learned reward classifier (HIL-SERL style)
     use_reward_classifier = True
@@ -178,7 +177,7 @@ class TrainConfig(DefaultTrainingConfig):
         env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
         # Optional reward classifier wrapper
-        if classifier and self.use_reward_classifier:
+        if classifier:
             clf = load_classifier_func(
                 key=jax.random.PRNGKey(0),
                 sample=env.observation_space.sample(),
@@ -187,20 +186,11 @@ class TrainConfig(DefaultTrainingConfig):
             )
 
             def reward_func(obs):
-                # sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
-                # print(obs)
-                # return int(sigmoid(clf(obs)) > 0.7)
                 logits = clf(obs)
-                logits = jnp.asarray(logits)
-                logit0 = jnp.ravel(logits)[0]          # force scalar
+                logit0 = jnp.ravel(jnp.asarray(logits))[0]
+                return jax.nn.sigmoid(logit0)
 
-                # convert logits -> probability
-                p = jax.nn.sigmoid(logit0)
-
-                # return python float
-                return float(jax.device_get(p))
-
-            env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.7, consecutive=3)
+            env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.7, consecutive=3, target_hz=10)
 
         # Gripper penalty support for hybrid agent
         env = GripperPenaltyWrapper(env, penalty=-0.02)

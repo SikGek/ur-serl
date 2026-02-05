@@ -438,11 +438,12 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
 
     Also supports K-frame hysteresis to avoid one-frame false positives.
     """
-    def __init__(self, env, prob_func, threshold=0.7, consecutive=3):
+    def __init__(self, env, prob_func, threshold=0.7, consecutive=3, target_hz=None):
         super().__init__(env)
         self.prob_func = prob_func          # returns probability in [0,1]
         self.threshold = float(threshold)
         self.consecutive = int(consecutive)
+        self.target_hz = target_hz
         self._streak = 0
 
     def reset(self, **kwargs):
@@ -461,6 +462,7 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         return float(arr[0])
 
     def step(self, action):
+        t0 = time.time()
         obs, _env_reward, terminated, truncated, info = self.env.step(action)
         print("\n\n\n REWARD AT CLASSIFIER IS:", _env_reward, "\n\n\n")
         # Probability in [0,1]
@@ -474,19 +476,14 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         if truncated:
             self._streak = 0
             success = False
-            reward = 0.0
         else:
             # K-frame hysteresis
-            if is_pos:
-                self._streak += 1
-            else:
-                self._streak = 0
-
-            success = (self._streak >= self.consecutive)
-            reward = 1.0 if success else 0.0
-
-            if success:
-                terminated = True
+            self._streak = (self._streak + 1) if is_pos else 0
+            success = (self._streak>=self.consecutive)
+        reward = 1.0 if success else 0.0
+        if success:
+            terminated = True
+        
         print(reward)
         # Always populate succeed flag (prevents downstream KeyErrors)
         info["succeed"] = bool(success)
@@ -495,5 +492,6 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         info["reward_clf_prob"] = p
         info["reward_clf_pos"] = bool(is_pos)
         info["reward_clf_success"] = bool(success)
-
+        if self.target_hz is not None:
+            time.sleep(max(0.0, 1.0 / self.target_hz - (time.time()-t0)))
         return obs, reward, terminated, truncated, info

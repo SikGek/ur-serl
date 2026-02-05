@@ -320,7 +320,7 @@ class UR5Env(gym.Env):
         """standard gym step function."""
         start_time = time.time()
         action = np.clip(action, self.action_space.low, self.action_space.high)
-
+    
         # position
         next_pos = self.curr_pos.copy()
         next_pos[:3] = next_pos[:3] + action[:3] * self.action_scale[0] # + self.trajectory_dir
@@ -341,10 +341,11 @@ class UR5Env(gym.Env):
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
+        # succeed = bool(self.reached_goal_state(obs))
         succeed = bool(self.reached_goal_state(obs))
-        reward = reward if not truncated else reward - 10.  # truncation penalty
+        # reward = reward if not truncated else reward - 10.  # truncation penalty
         print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
-        done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
+        done = self.curr_path_length >= self.max_episode_length or truncated
 
         # if not succeed:
         #     try:
@@ -354,13 +355,10 @@ class UR5Env(gym.Env):
         if truncated:
             succeed = False
 
-        done = (
-            self.curr_path_length >= self.max_episode_length
-            or succeed
-            or truncated
-        )
+        done_for_infos = done or truncated
+    
 
-        info = self.get_cost_infos(done)
+        info = self.get_cost_infos(done_for_infos)
         info["succeed"] = succeed
         dt = time.time() - start_time
         to_sleep = max(0, (1.0 / self.hz) - dt)
@@ -368,7 +366,7 @@ class UR5Env(gym.Env):
             warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
         time.sleep(to_sleep)
         # done = False
-        return obs, reward, done, truncated, info
+        return obs, float(reward), bool(done), bool(truncated), info
 
     def compute_reward(self, obs, action) -> float:
         return 0.   # overwrite for each task
@@ -492,7 +490,7 @@ class UR5Env(gym.Env):
 
         shift = self.go_to_rest()
         self.curr_path_length = 0
-
+        # print(self.last_action.shape)
         obs = self._get_obs(np.zeros_like(self.last_action))
         return obs, {"reset_shift": shift}
 

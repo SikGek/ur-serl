@@ -20,8 +20,8 @@ from experiments.mappings import CONFIG_MAPPING
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("exp_name", None, "Name of experiment corresponding to folder.")
-flags.DEFINE_integer("num_epochs", 150, "Number of training epochs.")
-flags.DEFINE_integer("batch_size", 256, "Batch size.")
+flags.DEFINE_integer("num_epochs", 1000, "Number of training epochs.")
+flags.DEFINE_integer("batch_size", 512, "Batch size.")
 
 
 def main(_):
@@ -48,6 +48,7 @@ def main(_):
                 continue
             trans["labels"] = 1
             trans['actions'] = env.action_space.sample()
+            # print(trans)
             pos_buffer.insert(trans)
             
     pos_iterator = pos_buffer.get_iterator(

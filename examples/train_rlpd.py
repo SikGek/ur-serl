@@ -36,7 +36,7 @@ from experiments.mappings import CONFIG_MAPPING
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("exp_name", None, "Name of experiment corresponding to folder.")
+flags.DEFINE_string("exp_name", "ur5e_aruco_pick", "Name of experiment corresponding to folder.")
 flags.DEFINE_integer("seed", 42, "Random seed.")
 flags.DEFINE_boolean("learner", False, "Whether this is a learner.")
 flags.DEFINE_boolean("actor", False, "Whether this is an actor.")

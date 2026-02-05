@@ -144,6 +144,7 @@ def load_classifier_func(
     Return: a function that takes in an observation
             and returns the logits of the classifier.
     """
+    print(checkpoint_path)
     classifier = create_classifier(key, sample, image_keys, n_way=n_way)
     classifier = checkpoints.restore_checkpoint(
         checkpoint_path,

@@ -25,7 +25,11 @@ def _insert_recursively(
     dataset_dict: DatasetDict, data_dict: DatasetDict, insert_index: int
 ):
     if isinstance(dataset_dict, np.ndarray):
-        dataset_dict[insert_index] = data_dict
+        try:
+            dataset_dict[insert_index] = data_dict
+        except Exception as e:
+            print(data_dict)
+            raise(e)
     elif isinstance(dataset_dict, dict):
         for k in dataset_dict.keys():
             _insert_recursively(dataset_dict[k], data_dict[k], insert_index)
@@ -78,6 +82,13 @@ class ReplayBuffer(Dataset):
         return self._size
 
     def insert(self, data_dict: DatasetDict):
+        # for key in data_dict:
+        #     print(type(data_dict[key]))
+        #     if type(data_dict[key]) == dict:
+        #         for key2 in data_dict[key]:
+        #             print(data_dict[key][key2])
+        #             print(data_dict[key][key2][0].shape())
+        #     print(data_dict[key])
         _insert_recursively(self.dataset_dict, data_dict, self._insert_index)
 
         self._insert_index = (self._insert_index + 1) % self._capacity
