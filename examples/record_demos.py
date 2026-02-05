@@ -50,7 +50,7 @@ def main(_):
         trajectory.append(transition)
         
         pbar.set_description(f"Return: {returns}")
-
+        print("\n\n\n REWARD IS:", rew, "\n\n\n")
         obs = next_obs
         if done:
             if info["succeed"]:

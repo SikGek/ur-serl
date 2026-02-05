@@ -112,7 +112,7 @@ class DefaultEnvConfig:
 class UR5Env(gym.Env):
     def __init__(
             self,
-            hz: int = 10,
+            hz: int = 100,
             fake_env=False,
             config=DefaultEnvConfig,
             max_episode_length: int = 200000,
@@ -343,7 +343,7 @@ class UR5Env(gym.Env):
         truncated = self._is_truncated()
         succeed = bool(self.reached_goal_state(obs))
         reward = reward if not truncated else reward - 10.  # truncation penalty
-        print([self.curr_path_length, self.max_episode_length, self.reached_goal_state(obs), truncated])
+        print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
         done = self.curr_path_length >= self.max_episode_length or self.reached_goal_state(obs) or truncated
 
         if not succeed:

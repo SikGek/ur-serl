@@ -100,7 +100,7 @@ class EnvConfig(DefaultEnvConfig):
     WAIT_FOR_MARKER_ON_RESET = True
     MARKER_RESET_TIMEOUT_S = 3.0
 
-    MAX_EPISODE_LENGTH = 1000
+    MAX_EPISODE_LENGTH = 500
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05

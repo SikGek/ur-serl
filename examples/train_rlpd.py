@@ -423,10 +423,10 @@ def main(_):
             agent.state,
         )
         agent = agent.replace(state=ckpt)
-        ckpt_number = os.path.basename(
-            checkpoints.latest_checkpoint(os.path.abspath(FLAGS.checkpoint_path))
-        )[11:]
-        print_green(f"Loaded previous checkpoint at step {ckpt_number}.")
+        # ckpt_number = os.path.basename(
+        #     checkpoints.latest_checkpoint(os.path.abspath(FLAGS.checkpoint_path))
+        # )[11:]
+        print_green(f"Loaded previous checkpoint at step 150.")
 
     def create_replay_buffer_and_wandb_logger():
         replay_buffer = MemoryEfficientReplayBufferDataStore(

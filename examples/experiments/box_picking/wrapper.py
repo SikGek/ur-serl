@@ -462,7 +462,7 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, _env_reward, terminated, truncated, info = self.env.step(action)
-
+        print("\n\n\n REWARD AT CLASSIFIER IS:", _env_reward, "\n\n\n")
         # Probability in [0,1]
         p_raw = self.prob_func(obs)
         p = self._to_float_scalar(p_raw)
@@ -487,7 +487,7 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
 
             if success:
                 terminated = True
-
+        print(reward)
         # Always populate succeed flag (prevents downstream KeyErrors)
         info["succeed"] = bool(success)
 
