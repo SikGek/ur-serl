@@ -82,8 +82,9 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
         for episode in range(FLAGS.eval_n_trajs):
             obs, _ = env.reset()
             done = False
+            truncated = False
             start_time = time.time()
-            while not done:
+            while not (done or truncated):
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
@@ -173,7 +174,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 info.pop("left")
             if "right" in info:
                 info.pop("right")
-
+            executed_action = info.get("interven_action", actions)
             # override the action with the intervention action
             if "hil_action" in info:
                 print("\n\n INTERVENING \n\n")
@@ -188,10 +189,10 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
             running_return += reward
             transition = dict(
                 observations=obs,
-                actions=actions,
+                actions=executed_action,
                 next_observations=next_obs,
                 rewards=reward,
-                masks=1.0 - done,
+                masks=0.0 if terminal else 1.0,
                 dones=terminal,
             )
             if 'grasp_penalty' in info:
