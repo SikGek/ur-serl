@@ -343,7 +343,7 @@ class UR5Env(gym.Env):
         truncated = self._is_truncated()
         # succeed = bool(self.reached_goal_state(obs))
         # succeed = bool(self.reached_goal_state(obs))
-        reward = reward if not truncated else reward - 10.  # truncation penalty
+        # reward = reward if not truncated else reward - 10.  # truncation penalty
         # print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
         done = self.curr_path_length >= self.max_episode_length or truncated
 

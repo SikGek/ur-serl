@@ -407,9 +407,9 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
         # Add additional information to the info dictionary about the intervention.
         if replaced:
-            info["hil_action"] = new_action # key for the human in the loop action
+            info["intervene_action"] = new_action # key for the human in the loop action
             
-        info["intervene_action"] = new_action
+        
         # print(new_action)
         info["left"] = self.left.any()
         info["right"] = self.right.any()

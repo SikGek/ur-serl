@@ -88,7 +88,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    argmax=False,
+                    argmax=True,
                     seed=key
                 )
                 actions = np.asarray(jax.device_get(actions))
@@ -174,11 +174,11 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 info.pop("left")
             if "right" in info:
                 info.pop("right")
-            executed_action = info.get("interven_action", actions)
+            # executed_action = info.get("interven_action", actions)
             # override the action with the intervention action
-            if "hil_action" in info:
+            if "intervene_action" in info:
                 print("\n\n INTERVENING \n\n")
-                actions = info.pop("hil_action")
+                actions = info.pop("intervene_action")
                 intervention_steps += 1
                 if not already_intervened:
                     intervention_count += 1
@@ -189,7 +189,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
             running_return += reward
             transition = dict(
                 observations=obs,
-                actions=executed_action,
+                actions=actions,
                 next_observations=next_obs,
                 rewards=reward,
                 masks=0.0 if terminal else 1.0,
@@ -204,6 +204,9 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 demo_transitions.append(copy.deepcopy(transition))
 
             obs = next_obs
+            if step%10==0:
+                client.update()
+                
             if done or truncated:
                 info["episode"]["intervention_count"] = intervention_count
                 info["episode"]["intervention_steps"] = intervention_steps
