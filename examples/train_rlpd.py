@@ -183,7 +183,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 already_intervened = True
             else:
                 already_intervened = False
-
+            terminal = bool(done or truncated)
             running_return += reward
             transition = dict(
                 observations=obs,
@@ -191,7 +191,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 next_observations=next_obs,
                 rewards=reward,
                 masks=1.0 - done,
-                dones=done,
+                dones=terminal,
             )
             if 'grasp_penalty' in info:
                 transition['grasp_penalty']= info['grasp_penalty']
