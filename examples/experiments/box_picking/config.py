@@ -43,11 +43,11 @@ class EnvConfig(DefaultEnvConfig):
     RANDOM_ROT_RANGE = (0.0,)
     p0 = [-0.1274, -0.4032, 0.2258]
     # Workspace bounds (you must tune)
-    ABS_POSE_LIMIT_LOW = np.array([p0[0]-0.25, p0[1]-0.25, p0[2]-0.20, -0.08, -0.08, -0.15])
-    ABS_POSE_LIMIT_HIGH = np.array([p0[0]+0.25, p0[1]+0.25, p0[2]+0.15, 0.08, 0.08, 0.15])
+    ABS_POSE_LIMIT_LOW = np.array([p0[0]-0.20, p0[1]-0.20, p0[2]-0.15, -0.08, -0.08, -0.15])
+    ABS_POSE_LIMIT_HIGH = np.array([p0[0]+0.20, p0[1]+0.20, p0[2]+0.10, 0.08, 0.08, 0.15])
     ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
     # ACTION_SCALE = np.array([0.07, 0.1, 1.0], dtype=np.float32)
-    ACTION_SCALE = np.array([0.01, 0.05, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.05, 0.1, 1.0], dtype=np.float32)
 
     # -------- Cameras (Franka-style dict) --------
     REALSENSE_CAMERAS = {
@@ -103,7 +103,7 @@ class EnvConfig(DefaultEnvConfig):
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.5  # faster
+    FORCEMODE_DAMPING: float = 0.2  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
