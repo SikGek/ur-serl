@@ -434,6 +434,58 @@ import numpy as np
 import jax
 import gymnasium as gym
 
+class Quat2RotvecWrapper(gym.Wrapper):
+    """
+    Converts obs['state']['tcp_pose'] from:
+      (x, y, z, qx, qy, qz, qw)  -->  (x, y, z, rx, ry, rz)
+
+    where (rx, ry, rz) is a rotation-vector (axis * angle) in radians.
+
+    - Place this BEFORE SERLObsWrapper (same place you used Quat2EulerWrapper).
+    - Safe no-op if tcp_pose is already length-6.
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+        self._patch_space()
+
+    def _patch_space(self):
+        # Patch the observation space to reflect the 6D pose.
+        # This is important because you create the agent using env.observation_space.sample().
+        if isinstance(self.observation_space, gym.spaces.Dict):
+            st = self.observation_space.spaces.get("state", None)
+            if isinstance(st, gym.spaces.Dict) and "tcp_pose" in st.spaces:
+                st.spaces["tcp_pose"] = gym.spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(6,), dtype=np.float32
+                )
+
+    def observation(self, obs):
+        pose = np.asarray(obs["state"]["tcp_pose"], dtype=np.float64).reshape(-1)
+
+        if pose.shape[0] == 7:
+            xyz = pose[:3]
+            quat = pose[3:7]  # (qx,qy,qz,qw) — SciPy expects (x,y,z,w)
+            rotvec = R.from_quat(quat).as_rotvec()  # radians
+            obs["state"]["tcp_pose"] = np.concatenate([xyz, rotvec]).astype(np.float32)
+
+        elif pose.shape[0] == 6:
+            # Already xyz+rotvec
+            obs["state"]["tcp_pose"] = pose.astype(np.float32)
+
+        else:
+            # Unexpected shape; keep but cast to float32 to avoid downstream dtype issues
+            obs["state"]["tcp_pose"] = pose.astype(np.float32)
+
+        return obs
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        return self.observation(obs), info
+
+    def step(self, action):
+        obs, r, term, trunc, info = self.env.step(action)
+        return self.observation(obs), r, term, trunc, info
+
 class RewardClassifierTerminateWrapper(gym.Wrapper):
     """
     Classifier -> binary reward + terminate on success.

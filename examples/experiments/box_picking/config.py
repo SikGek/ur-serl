@@ -20,7 +20,7 @@ from ur_env.envs.relative_env import RelativeFrame       # should exist in your 
 from experiments.config import DefaultTrainingConfig      # your training base
 from experiments.box_picking.wrapper import (
     UR5EArucoPickEnv,
-    Quat2EulerWrapper,
+    Quat2RotvecWrapper,
     GripperPenaltyWrapper,
     RewardClassifierTerminateWrapper,
 )
@@ -47,7 +47,7 @@ class EnvConfig(DefaultEnvConfig):
     ABS_POSE_LIMIT_HIGH = np.array([p0[0]+0.20, p0[1]+0.20, p0[2]+0.10, 0.08, 0.08, 0.15])
     ABS_POSE_RANGE_LIMITS = np.array([-0.10, 0.10], dtype=np.float32)
     # ACTION_SCALE = np.array([0.07, 0.1, 1.0], dtype=np.float32)
-    ACTION_SCALE = np.array([0.05, 0.1, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.02, 0.1, 1.0], dtype=np.float32)
 
     # -------- Cameras (Franka-style dict) --------
     REALSENSE_CAMERAS = {
@@ -103,7 +103,7 @@ class EnvConfig(DefaultEnvConfig):
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.2  # faster
+    FORCEMODE_DAMPING: float = 0.8  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
@@ -136,7 +136,7 @@ class TrainConfig(DefaultTrainingConfig):
     proprio_keys = ["tcp_pose", "tcp_vel", "tcp_force", "tcp_torque", "gripper_pose", "gripper_object"]
 
     encoder_type = "resnet-pretrained"
-    discount = 0.97
+    discount = 0.99
     cta_ratio = 2
     random_steps = 0
     buffer_period = 1000
@@ -168,7 +168,7 @@ class TrainConfig(DefaultTrainingConfig):
         env = RelativeFrame(env)
 
         # Quaternion -> Euler (requested)
-        env = Quat2EulerWrapper(env)
+        env = Quat2RotvecWrapper(env)
 
         # SERL obs formatting
         env = SERLObsWrapper(env, proprio_keys=self.proprio_keys)
