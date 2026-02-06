@@ -498,7 +498,7 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         threshold=0.85,
         consecutive=2,
         target_hz=None,
-        trunc_penalty=-10.0,     # <-- IMPORTANT
+        trunc_penalty=-1.0,     # <-- IMPORTANT
         pass_env_reward=False,   # optional: add env shaping (usually False for HIL-SERL)
         debug_print_every=0,     # 0 = never
     ):
