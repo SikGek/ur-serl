@@ -410,7 +410,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
             info["hil_action"] = new_action # key for the human in the loop action
             
         info["intervene_action"] = new_action
-        print(new_action)
+        # print(new_action)
         info["left"] = self.left.any()
         info["right"] = self.right.any()
         # print(action, new_action)
