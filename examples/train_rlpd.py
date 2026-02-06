@@ -176,6 +176,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
 
             # override the action with the intervention action
             if "hil_action" in info:
+                print("\n\n INTERVENING \n\n")
                 actions = info.pop("hil_action")
                 intervention_steps += 1
                 if not already_intervened:
