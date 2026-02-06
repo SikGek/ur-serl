@@ -61,3 +61,139 @@ jaxlib.xla_extension.XlaRuntimeError: FAILED_PRECONDITION: DNN library initializ
   File "/home/user/ur-serl/.venv/lib/python3.10/site-packages/jax/_src/core.py", line 642, in check_scalar_conversion
     raise TypeError("Only scalar arrays can be converted to Python scalars; "
 TypeError: Only scalar arrays can be converted to Python scalars; got arr.ndim=1
+
+ bash ./run_actor.sh 
+2026-02-06 21:35:26.492941: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:479] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2026-02-06 21:35:26.508955: E external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:10575] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2026-02-06 21:35:26.508997: E external/local_xla/xla/stream_executor/cuda/cuda_blas.cc:1442] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2026-02-06 21:35:27.016280: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home/user/ur-serl/examples/experiments/box_picking
+2026-02-06 21:35:31.399345: W tensorflow/core/common_runtime/gpu/gpu_device.cc:2251] Cannot dlopen some GPU libraries. Please make sure the missing libraries mentioned above are installed properly if you would like to use GPU. Follow the guide at https://www.tensorflow.org/install/gpu for how to download and setup the required libraries for your platform.
+Skipping registering GPU devices...
+[CAM] Cameras are ready!
+Activation completed. Activation time :  4.76837158203125e-07
+[RIC] target position set to curr pos: [-0.113  -0.424   0.2346  0.0504 -0.8155  0.5764  0.0126]
+[RIC] Controller has started and is ready!
+SpaceMouseCompact found
+Opened real SpaceMouseExpert
+/home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt
+wait for frames took 0.757 seconds
+The ResNet-10 weights already exist at '/home/user/.serl/resnet10_params.pkl'.
+Loaded 5.418792M parameters from ResNet-10 pretrained on ImageNet-1K
+replaced conv_init in encoder_wrist
+replaced norm_init in encoder_wrist
+replaced ResNetBlock_0 in encoder_wrist
+replaced ResNetBlock_1 in encoder_wrist
+replaced ResNetBlock_2 in encoder_wrist
+replaced ResNetBlock_3 in encoder_wrist
+I0206 21:35:40.194988 132337285429056 checkpoints.py:1110] Restoring orbax checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100
+I0206 21:35:40.195227 132337285429056 abstract_checkpointer.py:35] orbax-checkpoint version: 0.7.0
+I0206 21:35:40.197120 132337285429056 checkpointer.py:237] Restoring checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100.
+W0206 21:35:40.342344 132337285429056 transform_utils.py:230] The transformations API will eventually be replaced by an upgraded design. The current API will not be removed until this point, but it will no longer be actively worked on.
+I0206 21:35:40.344832 132337285429056 checkpointer.py:240] Finished restoring checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100.
+I0206 21:35:40.344985 132337285429056 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: Checkpointer:restore.checkpoint_100
+I0206 21:35:40.355464 132337285429056 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:35:40.355724 132337285429056 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:35:40.355822 132337285429056 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:35:40.355890 132337285429056 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+The ResNet-10 weights already exist at '/home/user/.serl/resnet10_params.pkl'.
+Loaded 5.418792M parameters from ResNet-10 pretrained on ImageNet-1K
+replaced conv_init in pretrained_encoder
+replaced norm_init in pretrained_encoder
+replaced ResNetBlock_0 in pretrained_encoder
+replaced ResNetBlock_1 in pretrained_encoder
+replaced ResNetBlock_2 in pretrained_encoder
+replaced ResNetBlock_3 in pretrained_encoder
+/home/user/ur-serl/examples/experiments/box_picking/../../train_rlpd.py:421: DeprecationWarning: jax.tree_map is deprecated: use jax.tree.map (jax v0.4.25 or newer) or jax.tree_util.tree_map (any JAX version).
+  jax.tree_map(jnp.array, agent), sharding.replicate()
+Checkpoint path already exists. Press Enter to resume training.
+
+bash ./run_learner.sh 
+2026-02-06 21:38:31.988168: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:479] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2026-02-06 21:38:32.000829: E external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:10575] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2026-02-06 21:38:32.000889: E external/local_xla/xla/stream_executor/cuda/cuda_blas.cc:1442] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2026-02-06 21:38:32.448345: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home/user/ur-serl/examples/experiments/box_picking
+2026-02-06 21:38:35.831373: W tensorflow/core/common_runtime/gpu/gpu_device.cc:2251] Cannot dlopen some GPU libraries. Please make sure the missing libraries mentioned above are installed properly if you would like to use GPU. Follow the guide at https://www.tensorflow.org/install/gpu for how to download and setup the required libraries for your platform.
+Skipping registering GPU devices...
+[UR5Env] is fake! True
+/home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt
+The ResNet-10 weights already exist at '/home/user/.serl/resnet10_params.pkl'.
+Loaded 5.418792M parameters from ResNet-10 pretrained on ImageNet-1K
+replaced conv_init in encoder_wrist
+replaced norm_init in encoder_wrist
+replaced ResNetBlock_0 in encoder_wrist
+replaced ResNetBlock_1 in encoder_wrist
+replaced ResNetBlock_2 in encoder_wrist
+replaced ResNetBlock_3 in encoder_wrist
+I0206 21:38:41.263544 138458773280576 checkpoints.py:1110] Restoring orbax checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100
+I0206 21:38:41.263698 138458773280576 abstract_checkpointer.py:35] orbax-checkpoint version: 0.7.0
+I0206 21:38:41.265757 138458773280576 checkpointer.py:237] Restoring checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100.
+W0206 21:38:41.356348 138458773280576 transform_utils.py:230] The transformations API will eventually be replaced by an upgraded design. The current API will not be removed until this point, but it will no longer be actively worked on.
+I0206 21:38:41.358426 138458773280576 checkpointer.py:240] Finished restoring checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100.
+I0206 21:38:41.358505 138458773280576 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: Checkpointer:restore.checkpoint_100
+I0206 21:38:41.361376 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:38:41.361514 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:38:41.361587 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:38:41.361648 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+The ResNet-10 weights already exist at '/home/user/.serl/resnet10_params.pkl'.
+Loaded 5.418792M parameters from ResNet-10 pretrained on ImageNet-1K
+replaced conv_init in pretrained_encoder
+bash ./run_learner.sh 
+2026-02-06 21:38:31.988168: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:479] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2026-02-06 21:38:32.000829: E external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:10575] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2026-02-06 21:38:32.000889: E external/local_xla/xla/stream_executor/cuda/cuda_blas.cc:1442] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2026-02-06 21:38:32.448345: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home/user/ur-serl/examples/experiments/box_picking
+2026-02-06 21:38:35.831373: W tensorflow/core/common_runtime/gpu/gpu_device.cc:2251] Cannot dlopen some GPU libraries. Please make sure the missing libraries mentioned above are installed properly if you would like to use GPU. Follow the guide at https://www.tensorflow.org/install/gpu for how to download and setup the required libraries for your platform.
+Skipping registering GPU devices...
+[UR5Env] is fake! True
+/home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt
+The ResNet-10 weights already exist at '/home/user/.serl/resnet10_params.pkl'.
+Loaded 5.418792M parameters from ResNet-10 pretrained on ImageNet-1K
+replaced conv_init in encoder_wrist
+replaced norm_init in encoder_wrist
+replaced ResNetBlock_0 in encoder_wrist
+replaced ResNetBlock_1 in encoder_wrist
+replaced ResNetBlock_2 in encoder_wrist
+replaced ResNetBlock_3 in encoder_wrist
+I0206 21:38:41.263544 138458773280576 checkpoints.py:1110] Restoring orbax checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100
+I0206 21:38:41.263698 138458773280576 abstract_checkpointer.py:35] orbax-checkpoint version: 0.7.0
+I0206 21:38:41.265757 138458773280576 checkpointer.py:237] Restoring checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100.
+W0206 21:38:41.356348 138458773280576 transform_utils.py:230] The transformations API will eventually be replaced by an upgraded design. The current API will not be removed until this point, but it will no longer be actively worked on.
+I0206 21:38:41.358426 138458773280576 checkpointer.py:240] Finished restoring checkpoint from /home/user/ur-serl/examples/experiments/box_picking/classifier_ckpt/checkpoint_100.
+I0206 21:38:41.358505 138458773280576 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: Checkpointer:restore.checkpoint_100
+I0206 21:38:41.361376 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:38:41.361514 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:38:41.361587 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+I0206 21:38:41.361648 138458773280576 _schedule.py:129] A polynomial schedule was set with a non-positive `transition_steps` value; this results in a constant schedule with value `init_value`.
+The ResNet-10 weights already exist at '/home/user/.serl/resnet10_params.pkl'.
+Loaded 5.418792M parameters from ResNet-10 pretrained on ImageNet-1K
+replaced conv_init in pretrained_encoder
+eplaced norm_init in pretrained_encoder
+replaced ResNetBlock_0 in pretrained_encoder
+replaced ResNetBlock_1 in pretrained_encoder
+replaced ResNetBlock_2 in pretrained_encoder
+replaced ResNetBlock_3 in pretrained_encoder
+/home/user/ur-serl/examples/experiments/box_picking/../../train_rlpd.py:421: DeprecationWarning: jax.tree_map is deprecated: use jax.tree.map (jax v0.4.25 or newer) or jax.tree_util.tree_map (any JAX version).
+  jax.tree_map(jnp.array, agent), sharding.replicate()
+entity: null
+exp_descriptor: ur5e_aruco_pick
+experiment_id: ur5e_aruco_pick_20260206_213844
+group: null
+project: hil-serl
+tag: ur5e_aruco_pick
+unique_identifier: '20260206_213844'
+
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/user/.netrc.
+wandb: Currently logged in as: sikgaek (sikgaek-kaist) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /tmp/tmpe8xrtwtl/wandb/run-20260206_213844-ur5e_aruco_pick_20260206_213844
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run ur5e_aruco_pick_20260206_213844
+wandb: ⭐️ View project at https://wandb.ai/sikgaek-kaist/hil-serl
+wandb: 🚀 View run at https://wandb.ai/sikgaek-kaist/hil-serl/runs/ur5e_aruco_pick_20260206_213844
+Demo path is:  ../../../demo_data/ur5e_aruco_pick_20_demos_2026-02-06_17-13-23.pkl Current working directory is:  /home/user/ur-serl/examples/experiments/box_picking
+ demo buffer size: 788
+ online buffer size: 0
+ starting learner loop
