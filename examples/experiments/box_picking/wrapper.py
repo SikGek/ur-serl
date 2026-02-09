@@ -299,7 +299,7 @@ class ToMrpWrapper(gym.ObservationWrapper):
     Convert the quaternion representation of the tcp pose to mrp angles
     """
 
-    def __init__(self, env: gym.Env, transform_obs=True):
+    def __init__(self, env: gym.Env, transform_obs=False):
         super().__init__(env)
         self.transform_obs = transform_obs
         # from xyz + quat to xyz + mrp
