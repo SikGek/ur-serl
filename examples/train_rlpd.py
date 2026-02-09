@@ -132,6 +132,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
 
     # Function to update the agent with new params
     def update_params(params):
+        print_green("Updating Parameters from Learner")
         nonlocal agent
         agent = agent.replace(state=agent.state.replace(params=params))
 
@@ -192,7 +193,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 actions=actions,
                 next_observations=next_obs,
                 rewards=reward,
-                masks=0.0 if terminal else 1.0,
+                masks=1.0-float(done),
                 dones=terminal,
             )
             if 'grasp_penalty' in info:

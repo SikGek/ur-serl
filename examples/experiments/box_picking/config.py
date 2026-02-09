@@ -174,7 +174,7 @@ class TrainConfig(DefaultTrainingConfig):
         env = SERLObsWrapper(env, proprio_keys=self.proprio_keys)
 
         # Chunking wrapper (requested)
-        env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+        env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=2)
 
         # Optional reward classifier wrapper
         if classifier:
