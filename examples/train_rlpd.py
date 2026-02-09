@@ -205,8 +205,8 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 demo_transitions.append(copy.deepcopy(transition))
 
             obs = next_obs
-            if step%10==0:
-                client.update()
+            # if step%10==0:
+            #     client.update()
                 
             if done or truncated:
                 info["episode"]["intervention_count"] = intervention_count
