@@ -10,8 +10,8 @@ from pynput import keyboard
 from experiments.mappings import CONFIG_MAPPING
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("exp_name", None, "Name of experiment corresponding to folder.")
-flags.DEFINE_integer("successes_needed", 200, "Number of successful transistions to collect.")
+flags.DEFINE_string("exp_name", "ur5e_aruco_pick", "Name of experiment corresponding to folder.")
+flags.DEFINE_integer("successes_needed", 250, "Number of successful transistions to collect.")
 
 
 success_key = False

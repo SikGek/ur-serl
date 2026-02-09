@@ -8,7 +8,7 @@ import numpy as np
 import gymnasium as gym
 import cv2
 from scipy.spatial.transform import Rotation as R
-
+from ur_env.utils.rotations import quat_2_euler, quat_2_mrp, omega_to_mrp_dot
 # --- UR5 base env + camera stack (adjust imports to your repo paths) ---
 from ur_env.envs.ur5_env import UR5Env  # <- change if your UR5Env lives elsewhere
 from ur_env.camera.video_capture import VideoCapture
@@ -294,6 +294,35 @@ class Quat2EulerWrapper(gym.Wrapper):
         obs, r, term, trunc, info = self.env.step(action)
         return self.observation(obs), r, term, trunc, info
 
+class ToMrpWrapper(gym.ObservationWrapper):
+    """
+    Convert the quaternion representation of the tcp pose to mrp angles
+    """
+
+    def __init__(self, env: gym.Env, transform_obs=True):
+        super().__init__(env)
+        self.transform_obs = transform_obs
+        # from xyz + quat to xyz + mrp
+        self.observation_space["state"]["tcp_pose"] = gym.spaces.Box(
+            -np.inf, np.inf, shape=(6,)
+        )
+
+    def observation(self, observation):
+        # convert tcp pose from quat to mrp
+        tcp_pose = observation["state"]["tcp_pose"]
+        tcp_pose_mrp = np.concatenate((tcp_pose[:3], quat_2_mrp(tcp_pose[3:])))
+        observation["state"]["tcp_pose"] = tcp_pose_mrp
+
+        if self.transform_obs:
+            # Map angular velocity (in reset/body frame) to MRP rate using current MRP
+            sigma = tcp_pose_mrp[3:6]
+            omega = observation["state"]["tcp_vel"][3:6]
+            observation["state"]["tcp_vel"][3:6] = omega_to_mrp_dot(sigma, omega)
+            # If EMA velocity exists, convert its angular part as well
+            if "ema_tcp_vel" in observation["state"]:
+                omega_ema = observation["state"]["ema_tcp_vel"][3:6]
+                observation["state"]["ema_tcp_vel"][3:6] = omega_to_mrp_dot(sigma, omega_ema)
+        return observation
 
 # class MultiCameraBinaryRewardClassifierWrapper(gym.Wrapper):
 #     """
@@ -429,26 +458,95 @@ class GripperPenaltyWrapper(gym.Wrapper):
 
 #         return obs, reward, terminated, truncated, info
     
+import time
+import numpy as np
+import jax
+import gymnasium as gym
+
+class Quat2RotvecWrapper(gym.Wrapper):
+    """
+    Converts obs['state']['tcp_pose'] from:
+      (x, y, z, qx, qy, qz, qw)  -->  (x, y, z, rx, ry, rz)
+
+    where (rx, ry, rz) is a rotation-vector (axis * angle) in radians.
+
+    - Place this BEFORE SERLObsWrapper (same place you used Quat2EulerWrapper).
+    - Safe no-op if tcp_pose is already length-6.
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+        self._patch_space()
+
+    def _patch_space(self):
+        # Patch the observation space to reflect the 6D pose.
+        # This is important because you create the agent using env.observation_space.sample().
+        if isinstance(self.observation_space, gym.spaces.Dict):
+            st = self.observation_space.spaces.get("state", None)
+            if isinstance(st, gym.spaces.Dict) and "tcp_pose" in st.spaces:
+                st.spaces["tcp_pose"] = gym.spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(6,), dtype=np.float32
+                )
+
+    def observation(self, obs):
+        pose = np.asarray(obs["state"]["tcp_pose"], dtype=np.float64).reshape(-1)
+
+        if pose.shape[0] == 7:
+            xyz = pose[:3]
+            quat = pose[3:7]  # (qx,qy,qz,qw) — SciPy expects (x,y,z,w)
+            rotvec = R.from_quat(quat).as_rotvec()  # radians
+            obs["state"]["tcp_pose"] = np.concatenate([xyz, rotvec]).astype(np.float32)
+
+        elif pose.shape[0] == 6:
+            # Already xyz+rotvec
+            obs["state"]["tcp_pose"] = pose.astype(np.float32)
+
+        else:
+            # Unexpected shape; keep but cast to float32 to avoid downstream dtype issues
+            obs["state"]["tcp_pose"] = pose.astype(np.float32)
+
+        return obs
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        return self.observation(obs), info
+
+    def step(self, action):
+        obs, r, term, trunc, info = self.env.step(action)
+        return self.observation(obs), r, term, trunc, info
+
 class RewardClassifierTerminateWrapper(gym.Wrapper):
     """
-    Turns a learned classifier into:
-      - binary reward (0/1)
-      - episode termination on success
-      - info["succeed"]=True on success
-
-    Also supports K-frame hysteresis to avoid one-frame false positives.
+    Classifier -> binary reward + terminate on success.
+    Adds truncation penalty so safety truncations matter to learning.
     """
-    def __init__(self, env, prob_func, threshold=0.7, consecutive=3, target_hz=None):
+    def __init__(
+        self,
+        env,
+        prob_func,
+        threshold=0.85,
+        consecutive=2,
+        target_hz=None,
+        trunc_penalty=-1.0,     # <-- IMPORTANT
+        pass_env_reward=False,   # optional: add env shaping (usually False for HIL-SERL)
+        debug_print_every=0,     # 0 = never
+    ):
         super().__init__(env)
-        self.prob_func = prob_func          # returns probability in [0,1]
+        self.prob_func = prob_func
         self.threshold = float(threshold)
         self.consecutive = int(consecutive)
         self.target_hz = target_hz
+        self.trunc_penalty = float(trunc_penalty)
+        self.pass_env_reward = bool(pass_env_reward)
+        self.debug_print_every = int(debug_print_every)
+
         self._streak = 0
+        self._step_i = 0
 
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
         self._streak = 0
+        self._step_i = 0
         info["succeed"] = False
         info["reward_clf_prob"] = 0.0
         info["reward_clf_pos"] = False
@@ -456,42 +554,63 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         return obs, info
 
     def _to_float_scalar(self, x) -> float:
-        """Robust scalar conversion for JAX/NumPy/python values."""
-        x_host = jax.device_get(x)  # safe even if x is already numpy/python
+        x_host = jax.device_get(x)
         arr = np.asarray(x_host).reshape(-1)
         return float(arr[0])
 
     def step(self, action):
         t0 = time.time()
-        obs, _env_reward, terminated, truncated, info = self.env.step(action)
-        print("\n\n\n REWARD AT CLASSIFIER IS:", _env_reward, "\n\n\n")
-        # Probability in [0,1]
-        p_raw = self.prob_func(obs)
-        p = self._to_float_scalar(p_raw)
-        p = float(np.clip(p, 0.0, 1.0))  # just safety
+        self._step_i += 1
 
+        obs, env_reward, terminated, truncated, info = self.env.step(action)
+
+        # --- Classifier probability ---
+        p = self._to_float_scalar(self.prob_func(obs))
+        p = float(np.clip(p, 0.0, 1.0))
         is_pos = (p >= self.threshold)
 
-        # If safety-truncated, do NOT allow classifier to declare success
+        # --- Hysteresis ---
         if truncated:
             self._streak = 0
             success = False
         else:
-            # K-frame hysteresis
             self._streak = (self._streak + 1) if is_pos else 0
-            success = (self._streak>=self.consecutive)
-        reward = 1.0 if success else 0.0
-        if success:
-            terminated = True
-        
-        print(reward)
-        # Always populate succeed flag (prevents downstream KeyErrors)
-        info["succeed"] = bool(success)
+            success = (self._streak >= self.consecutive)
 
-        # Useful debug signals
+        # --- Reward logic ---
+        clf_reward = 1.0 if success else 0.0
+
+        # Optional: keep env reward shaping in addition to classifier
+        reward = float(env_reward) if self.pass_env_reward else 0.0
+        reward += clf_reward
+
+        # Apply truncation penalty AFTER everything
+        # if truncated:
+        #     reward += self.trunc_penalty
+
+        # --- Termination logic ---
+        # Let success force termination (but do not override truncation)
+        if success and not truncated:
+            terminated = True
+
+        # If your base env incorrectly sets terminated=True when truncated,
+        # you can normalize:
+        if truncated:
+            terminated = False
+
+        # --- Info/debug ---
+        info["succeed"] = bool(success)
         info["reward_clf_prob"] = p
         info["reward_clf_pos"] = bool(is_pos)
         info["reward_clf_success"] = bool(success)
+        info["env_reward"] = float(env_reward)
+
+        if self.debug_print_every and (self._step_i % self.debug_print_every == 0):
+            print(f"[clf] p={p:.3f} pos={is_pos} streak={self._streak} success={success} "
+                  f"env_reward={float(env_reward):.3f} reward={reward:.3f} trunc={truncated}")
+
+        # --- Timing ---
         if self.target_hz is not None:
-            time.sleep(max(0.0, 1.0 / self.target_hz - (time.time()-t0)))
+            time.sleep(max(0.0, 1.0 / self.target_hz - (time.time() - t0)))
+
         return obs, reward, terminated, truncated, info

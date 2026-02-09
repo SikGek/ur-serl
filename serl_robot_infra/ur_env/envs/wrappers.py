@@ -323,7 +323,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
             gripper_action = np.zeros((1,)) + int(self.left.any()) - int(self.right.any())
             expert_a = np.concatenate((expert_a, gripper_action), axis=0)
 
-        if time.time() - self.last_intervene < 0.5 and intervened:
+        if time.time() - self.last_intervene < 0.5:
             expert_a = self.adapt_spacemouse_output(expert_a)
             return expert_a, True
 
@@ -407,9 +407,9 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
         # Add additional information to the info dictionary about the intervention.
         if replaced:
-            info["hil_action"] = new_action # key for the human in the loop action
+            info["intervene_action"] = new_action # key for the human in the loop action
             
-        info["intervene_action"] = new_action
+        
         # print(new_action)
         info["left"] = self.left.any()
         info["right"] = self.right.any()

@@ -82,12 +82,13 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
         for episode in range(FLAGS.eval_n_trajs):
             obs, _ = env.reset()
             done = False
+            truncated = False
             start_time = time.time()
-            while not done:
+            while not (done or truncated):
                 sampling_rng, key = jax.random.split(sampling_rng)
                 actions = agent.sample_actions(
                     observations=jax.device_put(obs),
-                    argmax=False,
+                    argmax=True,
                     seed=key
                 )
                 actions = np.asarray(jax.device_get(actions))
@@ -131,6 +132,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
 
     # Function to update the agent with new params
     def update_params(params):
+        print_green("Updating Parameters from Learner")
         nonlocal agent
         agent = agent.replace(state=agent.state.replace(params=params))
 
@@ -173,25 +175,26 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 info.pop("left")
             if "right" in info:
                 info.pop("right")
-
+            # executed_action = info.get("interven_action", actions)
             # override the action with the intervention action
-            if "hil_action" in info:
-                actions = info.pop("hil_action")
+            if "intervene_action" in info:
+                print("\n\n INTERVENING \n\n")
+                actions = info.pop("intervene_action")
                 intervention_steps += 1
                 if not already_intervened:
                     intervention_count += 1
                 already_intervened = True
             else:
                 already_intervened = False
-
+            terminal = bool(done or truncated)
             running_return += reward
             transition = dict(
                 observations=obs,
                 actions=actions,
                 next_observations=next_obs,
                 rewards=reward,
-                masks=1.0 - done,
-                dones=done,
+                masks=1.0-float(done),
+                dones=terminal,
             )
             if 'grasp_penalty' in info:
                 transition['grasp_penalty']= info['grasp_penalty']
@@ -202,6 +205,9 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 demo_transitions.append(copy.deepcopy(transition))
 
             obs = next_obs
+            if step%10==0:
+                client.update()
+                
             if done or truncated:
                 info["episode"]["intervention_count"] = intervention_count
                 info["episode"]["intervention_steps"] = intervention_steps

@@ -6,7 +6,7 @@ class DefaultTrainingConfig:
 
     agent: str = "drq"
     max_traj_length: int = 100
-    batch_size: int = 256
+    batch_size: int = 128
     cta_ratio: int = 2
     discount: float = 0.97
 
@@ -14,7 +14,7 @@ class DefaultTrainingConfig:
     replay_buffer_capacity: int = 200000
 
     random_steps: int = 0
-    training_starts: int = 100
+    training_starts: int = 256
     steps_per_update: int = 50
 
     log_period: int = 10

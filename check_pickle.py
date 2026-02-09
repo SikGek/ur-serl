@@ -1,57 +1,62 @@
 import pickle
-import matplotlib.pyplot as plt
 import numpy as np
+import cv2
+import os
 
-def inspect_and_display_pickle(file_path):
+def interactive_cleaner(file_path):
     with open(file_path, 'rb') as f:
         data = pickle.load(f)
-        _, axes = plt.subplots(1, 1, figsize=(15, 5))
-        axes.imshow(np.squeeze(data[159]['observations']['wrist'].astype('uint8')))
-        plt.tight_layout()
-        plt.show()
-    # num_to_show = min(len(images), 1)
-    # _, axes = plt.subplots(1, num_to_show, figsize=(15, 5))
-    
-    # # Ensure axes is always iterable even if only 1 image
-    # if num_to_show == 1:
-    #     axes = [axes]
 
-    # for i in range(num_to_show):
-    #     # Convert to uint8 for proper color scaling
-    #     axes[i].imshow(images[80+i].astype('uint8'))
-    #     axes[i].set_title(f"Wrist Cam {i}")
-    #     axes[i].axis('off')
-    #42 97 159
+    indices_to_remove = []
+    print("--- Controls ---")
+    print("Any Key: Next Image")
+    print("'d'    : Mark for Deletion")
+    print("'q'    : Save and Quit")
     
-    axes[0].imshow(data[0]['observations']['wrist'][159].astype('uint8'))
-    axes[0].set_title(f"Wrist Cam {42}")
-    axes[0].axis('off')
-    plt.tight_layout()
-    plt.show()
-    print(f"Total transitions in file: {len(data)}")
+    cv2.namedWindow("Robotics Data Review", cv2.WINDOW_NORMAL)
 
-    images = []
-    for entry in data:
-        if 'observations' in entry and 'wrist' in entry['observations']:
-            img_data = entry['observations']['wrist']
+    for i, entry in enumerate(data):
+        try:
+            # Extract and Squeeze image
+            img = np.array(entry['observations']['wrist']).squeeze()
             
-            # 1. Squeeze out the extra (1, ...) dimension
-            img_data = np.squeeze(img_data) 
+            # Convert (C, H, W) to (H, W, C)
+            if img.ndim == 3 and img.shape[0] == 3:
+                img = img.transpose(1, 2, 0)
             
-            # 2. Check for (C, H, W) vs (H, W, C)
-            # If shape is (3, 128, 128), move the 3 to the end
-            if img_data.ndim == 3 and img_data.shape[0] == 3:
-                img_data = img_data.transpose(1, 2, 0)
+            # Convert RGB to BGR for OpenCV display
+            img_bgr = cv2.cvtColor(img.astype('uint8'), cv2.COLOR_RGB2BGR)
+            
+            # Add text overlay so you know which index you are looking at
+            display_img = img_bgr.copy()
+            cv2.putText(display_img, f"Index: {i} | Total: {len(data)}", (10, 20), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            cv2.imshow("Robotics Data Review", display_img)
+            
+            key = cv2.waitKey(0) & 0xFF
+            
+            if key == ord('d'):
+                indices_to_remove.append(i)
+                print(f"Marked index {i} for deletion.")
+            elif key == ord('q'):
+                print("Quitting review...")
+                break
                 
-            images.append(img_data)
+        except Exception as e:
+            print(f"Error at index {i}: {e}")
 
-    if not images:
-        print("No images found.")
-        return
+    cv2.destroyAllWindows()
 
-    # Display settings
+    # Step 2: Save the cleaned data
+    if indices_to_remove:
+        clean_data = [entry for i, entry in enumerate(data) if i not in indices_to_remove]
+        output_path = file_path
+        with open(output_path, 'wb') as f:
+            pickle.dump(clean_data, f)
+        print(f"Done! Removed {len(indices_to_remove)} items. Saved to {output_path}")
+    else:
+        print("No items were marked for deletion.")
 
-    # with open(file_path, 'wb') as f:
-    #     pickle.dump(data_to_save, f)
-
-inspect_and_display_pickle('classifier_data/ur5e_aruco_pick_200_success_images_2026-02-05_21-27-53.pkl')
+# Run it
+interactive_cleaner('classifier_data/ur5e_aruco_pick_failure_images_2026-02-06_17-04-45.pkl')

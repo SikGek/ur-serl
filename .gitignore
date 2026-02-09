@@ -11,7 +11,7 @@ __pycache__/
 *.npy
 rlds*/
 *log.global
-*.pkl*
+# *.pkl*
 
 # C extensions
 *.so

@@ -20,8 +20,8 @@ from experiments.mappings import CONFIG_MAPPING
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("exp_name", None, "Name of experiment corresponding to folder.")
-flags.DEFINE_integer("num_epochs", 1000, "Number of training epochs.")
-flags.DEFINE_integer("batch_size", 512, "Batch size.")
+flags.DEFINE_integer("num_epochs", 100, "Number of training epochs.")
+flags.DEFINE_integer("batch_size", 128, "Batch size.")
 
 
 def main(_):
