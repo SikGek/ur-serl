@@ -197,3 +197,26 @@ Demo path is:  ../../../demo_data/ur5e_aruco_pick_20_demos_2026-02-06_17-13-23.p
  demo buffer size: 788
  online buffer size: 0
  starting learner loop
+demo buffer size: 788
+ online buffer size: 0
+ starting learner loop
+Filling up replay buffer: 102it [01:24,  1.21it/s]                                                  
+ sent initial network to actor
+learner:   0%|                                             | 2000/1000000 [02:23<8:21:22, 33.18it/s]I0209 13:08:25.066358 124657957599040 checkpoints.py:571] Saving checkpoint at step: 2000
+I0209 13:08:25.066683 124657957599040 checkpoints.py:659] Using Orbax as backend to save Flax checkpoints. For potential troubleshooting see: https://flax.readthedocs.io/en/latest/guides/training_techniques/use_checkpointing.html#orbax-as-backend-troubleshooting
+I0209 13:08:25.069694 124657957599040 checkpointer.py:189] [process=0] Started saving checkpoint to /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000.
+I0209 13:08:25.070260 124657957599040 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: create_tmp_directory:pre.checkpoint_2000.1
+I0209 13:08:25.076130 124657957599040 atomicity.py:176] Creating tmp directory /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000.orbax-checkpoint-tmp-0
+I0209 13:08:25.077467 124657957599040 checkpoint.py:134] Wrote CheckpointMetadata=StepMetadata(init_timestamp_nsecs=1770610105077088593, commit_timestamp_nsecs=None), json={"init_timestamp_nsecs": 1770610105077088593, "commit_timestamp_nsecs": null} to /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000.orbax-checkpoint-tmp-0
+I0209 13:08:25.077767 124657957599040 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: create_tmp_directory:post.checkpoint_2000.2
+I0209 13:08:25.440190 124657957599040 base_pytree_checkpoint_handler.py:111] [process=0] /jax/checkpoint/write/blocking_bytes_per_sec: 699.0 MiB/s (total bytes: 252.7 MiB) (time elapsed: 361 milliseconds) (per-host)
+I0209 13:08:26.144345 124657957599040 future.py:88] ChainedFuture completed 2/2 futures in 0.70 seconds.
+I0209 13:08:26.144748 124657957599040 base_pytree_checkpoint_handler.py:111] [process=0] /jax/checkpoint/write/bytes_per_sec: 237.0 MiB/s (total bytes: 252.7 MiB) (time elapsed: a second) (per-host)
+I0209 13:08:26.145374 124657957599040 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: Checkpointer:save.checkpoint_2000
+I0209 13:08:26.159553 124657957599040 type_handlers.py:614] [process=0][thread=MainThread] Validating params in TensorStore KvStore.
+I0209 13:08:26.160099 124657957599040 atomicity.py:317] Renaming /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000.orbax-checkpoint-tmp-0 to /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000
+I0209 13:08:26.160529 124657957599040 checkpoint.py:174] Read CheckpointMetadata=StepMetadata(init_timestamp_nsecs=1770610105077088593, commit_timestamp_nsecs=None) from /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000.orbax-checkpoint-tmp-0
+I0209 13:08:26.160960 124657957599040 checkpoint.py:191] Updated CheckpointMetadata=StepMetadata(init_timestamp_nsecs=1770610105077088593, commit_timestamp_nsecs=1770610106160198963) to /home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000.orbax-checkpoint-tmp-0
+I0209 13:08:26.161416 124657957599040 atomicity.py:519] [process=0][thread=MainThread] Finished saving checkpoint (finalized tmp dir) to `/home/user/ur-serl/examples/experiments/box_picking/debug/checkpoint_2000`.
+I0209 13:08:26.161643 124657957599040 utils.py:240] [process=0][thread=MainThread] Skipping global process sync, barrier name: Checkpointer:finalize.checkpoint_2000
+learner:   0%|▏                                            | 3998/1000000 [03:27<8:15:25, 33.51it/s]
