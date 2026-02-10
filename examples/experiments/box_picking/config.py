@@ -15,12 +15,11 @@ from serl_launcher.networks.reward_classifier import load_classifier_func
 
 # UR wrappers (Spacemouse, RelativeFrame)
 from ur_env.envs.wrappers import SpacemouseIntervention  # should exist in your stack
-from ur_env.envs.relative_env import RelativeFrame, TrueTCPRelativeFrame       # should exist in your stack
+from ur_env.envs.relative_env import RelativeFrame, TCPActionRelativeFrame       # should exist in your stack
 
 from experiments.config import DefaultTrainingConfig      # your training base
 from experiments.box_picking.wrapper import (
     UR5EArucoPickEnv,
-    Quat2RotvecWrapper,
     GripperPenaltyWrapper,
     RewardClassifierTerminateWrapper,
     ToMrpWrapper,
@@ -160,14 +159,18 @@ class TrainConfig(DefaultTrainingConfig):
             hz=10,
             camera_mode="rgb",
         )
-
+        
+        # env = TCPActionRelativeFrame(env)
+        
         # Human-in-the-loop interventions (Spacemouse) like HIL-SERL workflow :contentReference[oaicite:6]{index=6}
         if not fake_env:
             env = SpacemouseIntervention(env)   # must output info["intervene_action"] for your train_rlpd actor loop
 
         # Relative observations (optional but requested)
+        # env = RelativeFrame(env, tool_offset_tool=np.array([0,0,0.16]))
         # env = RelativeFrame(env)
-        env = TrueTCPRelativeFrame(env)
+        # env = TCPActionRelativeFrame(env)
+
         # Quaternion -> Euler (requested)
         env = ToMrpWrapper(env)
 
@@ -194,9 +197,9 @@ class TrainConfig(DefaultTrainingConfig):
             #     sigmoid = lambda x: 1 / (1 + jnp.exp(-x))
             #     return int(sigmoid(clf(obs)) > 0.7 and obs["state"][0, 0] > 0.4)
 
-            env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.7, consecutive=3, target_hz=10)
+            env = RewardClassifierTerminateWrapper(env, reward_func, threshold=0.6, consecutive=3, target_hz=10)
 
         # Gripper penalty support for hybrid agent
-        env = GripperPenaltyWrapper(env, penalty=-0.02)
+        env = GripperPenaltyWrapper(env, penalty=-0.05)
 
         return env

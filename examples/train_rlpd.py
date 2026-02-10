@@ -329,7 +329,7 @@ def learner(rng, agent, replay_buffer, demo_buffer, wandb_logger=None):
     print_green("sent initial network to actor")
 
     # 50/50 sampling from RLPD, half from demo and half from online experience
-    demo_frac = 0.75
+    demo_frac = 0.5
     demo_bs = int(round(config.batch_size * demo_frac))
     demo_bs = max(1, min(config.batch_size - 1, demo_bs))
     online_bs = config.batch_size - demo_bs

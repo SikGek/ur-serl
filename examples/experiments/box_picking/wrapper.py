@@ -505,8 +505,8 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         reward += clf_reward
 
         # Apply truncation penalty AFTER everything
-        # if truncated:
-        #     reward += self.trunc_penalty
+        if truncated:
+            reward += self.trunc_penalty
 
         # --- Termination logic ---
         # Let success force termination (but do not override truncation)
