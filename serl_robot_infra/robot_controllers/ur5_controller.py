@@ -356,7 +356,7 @@ class UrImpedanceController(threading.Thread):
             await self._update_robot_state()
             time.sleep(0.01)
         self.ur_control.speedStop(a=1.)
-        print("\n\n\n", self.reset_Pose, "\n\n\n", self.reset_Q, "\n\n\n")
+        # print("\n\n\n", self.reset_Pose, "\n\n\n", self.reset_Q, "\n\n\n")
         if self.reset_Pose.std() > 0.001:
             success = success and  self.ur_control.moveL(self.reset_Pose, speed=0.5, acceleration=0.3)
             self.print(f"[RIC] moving to {self.reset_Pose} with moveL (task space)", both=self.verbose)

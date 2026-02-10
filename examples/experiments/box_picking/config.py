@@ -147,7 +147,7 @@ class TrainConfig(DefaultTrainingConfig):
     setup_mode = 'single-arm-learned-gripper'
 
     # Optional: enable a learned reward classifier (HIL-SERL style)
-    use_reward_classifier = True
+    # use_reward_classifier = True
     classifier_ckpt_path = os.path.abspath("classifier_ckpt/")
 
     def get_environment(self, fake_env=False, save_video=False, classifier=True):
@@ -166,7 +166,7 @@ class TrainConfig(DefaultTrainingConfig):
             env = SpacemouseIntervention(env)   # must output info["intervene_action"] for your train_rlpd actor loop
 
         # Relative observations (optional but requested)
-        env = RelativeFrame(env)
+        # env = RelativeFrame(env)
 
         # Quaternion -> Euler (requested)
         env = ToMrpWrapper(env)

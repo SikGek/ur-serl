@@ -125,7 +125,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                     seed=key
                 )
                 actions = np.asarray(jax.device_get(actions))
-
+                # print(actions)
                 next_obs, reward, done, truncated, info = env.step(actions)
                 obs = next_obs
 
@@ -201,6 +201,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 )
                 actions = np.asarray(jax.device_get(actions))
                 actions = action_filter(actions)
+                print("policy action is: ", actions, "\n")
 
         # Step environment
         with timer.context("step_env"):
@@ -213,8 +214,8 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
             # executed_action = info.get("interven_action", actions)
             # override the action with the intervention action
             if "intervene_action" in info:
-                print("\n\n INTERVENING \n\n")
                 actions = info.pop("intervene_action")
+                print("\n\n INTERVENING: ", actions)
                 intervention_steps += 1
                 if not already_intervened:
                     intervention_count += 1
