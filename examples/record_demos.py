@@ -44,7 +44,7 @@ def main(_):
                 rewards=rew,
                 masks=1.0 - done,
                 dones=done,
-                infos=info,
+                infos=info, 
             )
         )
         trajectory.append(transition)

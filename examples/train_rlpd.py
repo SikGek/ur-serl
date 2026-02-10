@@ -33,6 +33,7 @@ from serl_launcher.utils.launcher import (
 from serl_launcher.data.data_store import MemoryEfficientReplayBufferDataStore
 
 from experiments.mappings import CONFIG_MAPPING
+import math
 
 FLAGS = flags.FLAGS
 
@@ -63,11 +64,43 @@ def print_green(x):
 
 ##############################################################################
 
+class EMAActionFilter:
+    def __init__(self, hz: float, cutoff_hz: float = 2.0, filter_rot=True, filter_gripper=False):
+        self.dt = 1.0 / float(hz)
+        tau = 1.0 / (2.0 * math.pi * float(cutoff_hz))
+        self.alpha = self.dt / (tau + self.dt)
+        self.filter_rot = filter_rot
+        self.filter_gripper = filter_gripper
+        self.prev = None
+
+    def reset(self):
+        self.prev = None
+
+    def __call__(self, a: np.ndarray) -> np.ndarray:
+        a = np.asarray(a, dtype=np.float32).copy()
+
+        if self.prev is None:
+            self.prev = a.copy()
+            return a
+
+        # Filter only the continuous parts: usually first 6 dims (xyz + rot)
+        idx_end = 6
+        self.prev[:idx_end] = self.prev[:idx_end] + self.alpha * (a[:idx_end] - self.prev[:idx_end])
+
+        # Gripper: typically leave as-is (discrete-ish)
+        if self.filter_gripper:
+            self.prev[6] = self.prev[6] + self.alpha * (a[6] - self.prev[6])
+        else:
+            self.prev[6] = a[6]
+
+        return np.clip(self.prev, -1.0, 1.0).astype(np.float32)
+
 
 def actor(agent, data_store, intvn_data_store, env, sampling_rng):
     """
     This is the actor loop, which runs when "--actor" is set to True.
     """
+    action_filter = EMAActionFilter(hz=10, cutoff_hz=2)
     if FLAGS.eval_checkpoint_step:
         success_counter = 0
         time_list = []
@@ -142,6 +175,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
     demo_transitions = []
 
     obs, _ = env.reset()
+    action_filter.reset()
     done = False
 
     # training loop
@@ -166,6 +200,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                     argmax=False,
                 )
                 actions = np.asarray(jax.device_get(actions))
+                actions = action_filter(actions)
 
         # Step environment
         with timer.context("step_env"):
@@ -220,6 +255,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 already_intervened = False
                 client.update()
                 obs, _ = env.reset()
+                action_filter.reset()
 
         if step > 0 and config.buffer_period > 0 and step % config.buffer_period == 0:
             # dump to pickle file
@@ -292,20 +328,43 @@ def learner(rng, agent, replay_buffer, demo_buffer, wandb_logger=None):
     print_green("sent initial network to actor")
 
     # 50/50 sampling from RLPD, half from demo and half from online experience
+    demo_frac = 0.75
+    demo_bs = int(round(config.batch_size * demo_frac))
+    demo_bs = max(1, min(config.batch_size - 1, demo_bs))
+    online_bs = config.batch_size - demo_bs
+    print_green(f"Sampling ratio: demo={demo_bs}/{config.batch_size} ({demo_bs/config.batch_size:.2f}), "
+            f"online={online_bs}/{config.batch_size} ({online_bs/config.batch_size:.2f})")
+
+
     replay_iterator = replay_buffer.get_iterator(
         sample_args={
-            "batch_size": config.batch_size // 2,
+            "batch_size": online_bs,
             "pack_obs_and_next_obs": True,
         },
         device=sharding.replicate(),
     )
+
     demo_iterator = demo_buffer.get_iterator(
         sample_args={
-            "batch_size": config.batch_size // 2,
+            "batch_size": demo_bs,
             "pack_obs_and_next_obs": True,
         },
         device=sharding.replicate(),
     )
+    # replay_iterator = replay_buffer.get_iterator(
+    #     sample_args={
+    #         "batch_size": config.batch_size // 2,
+    #         "pack_obs_and_next_obs": True,
+    #     },
+    #     device=sharding.replicate(),
+    # )
+    # demo_iterator = demo_buffer.get_iterator(
+    #     sample_args={
+    #         "batch_size": config.batch_size // 2,
+    #         "pack_obs_and_next_obs": True,
+    #     },
+    #     device=sharding.replicate(),
+    # )
 
     # wait till the replay buffer is filled with enough data
     timer = Timer()
