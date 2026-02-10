@@ -273,3 +273,236 @@ class BaseFrameRotation(gym.Wrapper):
         action[:3] = self.base_frame_rotation @ action[:3]
         action[3:6] = (R.from_mrp(action[3:6]) * R.from_matrix(self.base_frame_rotation)).as_mrp()
         return action
+
+
+class TrueTCPRelativeFrame(gym.Wrapper):
+    """
+    True TCP/body-frame wrapper for UR-style envs that apply deltas in the base/space frame.
+
+    Incoming action (agent-level):
+        a_tcp = [dx, dy, dz, dσx, dσy, dσz, gripper]
+    where translation is a direction in TCP frame, and rotation is an MRP increment in TCP frame.
+
+    Underlying env expects (base/space-frame):
+        a_base = [dx, dy, dz, dσx, dσy, dσz, gripper]
+    but interprets rotation as:
+        R_next = R_delta_base * R_current
+        R_delta_base = from_mrp(action[3:6] * rot_scale)
+    so we must conjugate to convert body-frame increments to space-frame increments.
+
+    Also:
+      - Optionally rotates tcp_vel/tcp_force/tcp_torque into current TCP frame.
+      - Optionally replaces tcp_pose with pose relative to reset (in reset frame).
+      - Converts info["intervene_action"] to TCP-frame so replay actions are consistent.
+
+    Important: This wrapper assumes your env uses MRP for the rotational action part (like your UR5Env).
+    """
+
+    def __init__(
+        self,
+        env: gym.Env,
+        include_relative_pose: bool = True,
+        rotate_obs_to_tcp: bool = True,
+        convert_intervene_action: bool = True,
+        action_rot_is_mrp: bool = True,
+    ):
+        super().__init__(env)
+        self.include_relative_pose = bool(include_relative_pose)
+        self.rotate_obs_to_tcp = bool(rotate_obs_to_tcp)
+        self.convert_intervene_action = bool(convert_intervene_action)
+        self.action_rot_is_mrp = bool(action_rot_is_mrp)
+
+        # Reset reference
+        self._p0 = None
+        self._R0 = None  # Rotation object at reset (base<-tcp)
+
+        # Cache scales (read from env.unwrapped if possible)
+        self._pos_scale, self._rot_scale = self._infer_scales()
+
+    # -------------------- scale + state helpers --------------------
+
+    def _infer_scales(self):
+        # Defaults if not found
+        pos_scale = 1.0
+        rot_scale = 1.0
+        try:
+            base = self.env.unwrapped
+            if hasattr(base, "action_scale"):
+                pos_scale = float(base.action_scale[0])
+                # matches your UR5Env.step: R.from_mrp(action[3:6] * action_scale[1] / 4.)
+                rot_scale = float(base.action_scale[1]) / 4.0
+        except Exception:
+            pass
+        return pos_scale, rot_scale
+
+    def _get_base_pose_quat(self, obs=None):
+        """
+        Returns (p_base, q_base) for current TCP pose in BASE frame.
+        Prefer env.unwrapped.curr_pos since other wrappers may modify obs tcp_pose.
+        """
+        base = self.env.unwrapped
+        if hasattr(base, "curr_pos") and base.curr_pos is not None:
+            cp = np.asarray(base.curr_pos, dtype=np.float64).reshape(-1)
+            if cp.shape[0] >= 7:
+                return cp[:3].copy(), cp[3:7].copy()
+
+        # fallback to obs if needed
+        if obs is not None:
+            pose = np.asarray(obs["state"]["tcp_pose"], dtype=np.float64).reshape(-1)
+            if pose.shape[0] >= 7:
+                return pose[:3].copy(), pose[3:7].copy()
+
+        raise RuntimeError("Could not retrieve base tcp pose (need curr_pos or obs['state']['tcp_pose']).")
+
+    # -------------------- action transforms --------------------
+
+    def tcp_action_to_base(self, a_tcp: np.ndarray, q_base: np.ndarray) -> np.ndarray:
+        """
+        Convert action expressed in CURRENT TCP frame to base/space-frame action for env.step.
+        """
+        a_tcp = np.asarray(a_tcp, dtype=np.float32).copy()
+        a_base = a_tcp.copy()
+
+        # Rotation base<-tcp (SciPy uses x,y,z,w)
+        R_bt = R.from_quat(np.asarray(q_base, dtype=np.float64))
+
+        # --- translation: just rotate normalized direction ---
+        a_base[:3] = R_bt.apply(a_tcp[:3])
+
+        # --- rotation: body increment -> space increment via conjugation ---
+        if self.action_rot_is_mrp:
+            sigma_tcp = a_tcp[3:6] * self._rot_scale
+            R_delta_tcp = R.from_mrp(sigma_tcp)
+            R_delta_base = R_bt * R_delta_tcp * R_bt.inv()
+            sigma_base = R_delta_base.as_mrp()
+            a_base[3:6] = sigma_base / self._rot_scale
+        else:
+            # If using small-angle rotvec increments, vector-rotate is a decent approximation.
+            a_base[3:6] = R_bt.apply(a_tcp[3:6])
+
+        return np.clip(a_base, -1.0, 1.0).astype(np.float32)
+
+    def base_action_to_tcp(self, a_base: np.ndarray, q_base: np.ndarray) -> np.ndarray:
+        """
+        Convert base/space-frame action (what env executes) to CURRENT TCP-frame action.
+        Used mainly for converting info["intervene_action"] into the policy frame.
+        """
+        a_base = np.asarray(a_base, dtype=np.float32).copy()
+        a_tcp = a_base.copy()
+
+        R_bt = R.from_quat(np.asarray(q_base, dtype=np.float64))
+        R_tb = R_bt.inv()
+
+        # translation
+        a_tcp[:3] = R_tb.apply(a_base[:3])
+
+        # rotation
+        if self.action_rot_is_mrp:
+            sigma_base = a_base[3:6] * self._rot_scale
+            R_delta_base = R.from_mrp(sigma_base)
+            R_delta_tcp = R_tb * R_delta_base * R_tb.inv()
+            sigma_tcp = R_delta_tcp.as_mrp()
+            a_tcp[3:6] = sigma_tcp / self._rot_scale
+        else:
+            a_tcp[3:6] = R_tb.apply(a_base[3:6])
+
+        return np.clip(a_tcp, -1.0, 1.0).astype(np.float32)
+
+    # -------------------- observation transforms --------------------
+
+    def _transform_observation(self, obs, q_base_post: np.ndarray, action_tcp_executed: np.ndarray):
+        """
+        - Optionally rotate vel/force/torque to CURRENT TCP frame.
+        - Optionally convert tcp_pose to reset-relative pose.
+        - Optionally set obs["state"]["action"] to executed action in TCP frame.
+        """
+        if "state" not in obs:
+            return obs
+
+        obs = obs  # mutate in place (typical wrapper pattern)
+
+        # Optionally overwrite action in observation with the TCP-frame executed action
+        if "action" in obs["state"]:
+            obs["state"]["action"] = np.asarray(action_tcp_executed, dtype=np.float32)
+
+        # Rotate wrench / twist to TCP frame using CURRENT orientation
+        if self.rotate_obs_to_tcp:
+            R_bt = R.from_quat(np.asarray(q_base_post, dtype=np.float64))
+            R_tb = R_bt.inv()
+
+            def _rot3(x):
+                x = np.asarray(x, dtype=np.float32).copy()
+                return R_tb.apply(x).astype(np.float32)
+
+            if "tcp_vel" in obs["state"]:
+                v = np.asarray(obs["state"]["tcp_vel"], dtype=np.float32).copy()
+                v[:3] = _rot3(v[:3])
+                v[3:6] = _rot3(v[3:6])
+                obs["state"]["tcp_vel"] = v
+
+            if "tcp_force" in obs["state"]:
+                obs["state"]["tcp_force"] = _rot3(obs["state"]["tcp_force"])
+
+            if "tcp_torque" in obs["state"]:
+                obs["state"]["tcp_torque"] = _rot3(obs["state"]["tcp_torque"])
+
+            for k in ("ema_tcp_vel", "ema_force"):
+                if k in obs["state"]:
+                    vv = np.asarray(obs["state"][k], dtype=np.float32).copy()
+                    vv[:3] = _rot3(vv[:3])
+                    vv[3:6] = _rot3(vv[3:6])
+                    obs["state"][k] = vv
+
+        # Optionally convert tcp_pose to reset-relative pose (in reset frame)
+        if self.include_relative_pose and self._R0 is not None and self._p0 is not None:
+            # Need current base pose (p,q) — use env state, not obs (obs may be post-processed elsewhere)
+            p, q = self._get_base_pose_quat(obs=None)
+            R_bt = R.from_quat(q)
+            R_0b = self._R0.inv()
+
+            p_rel = R_0b.apply(p - self._p0)
+            q_rel = (R_0b * R_bt).as_quat()  # reset^-1 * current
+            obs["state"]["tcp_pose"] = np.concatenate([p_rel, q_rel]).astype(np.float32)
+
+        return obs
+
+    # -------------------- gym API --------------------
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+
+        # Store reset pose in BASE frame
+        p0, q0 = self._get_base_pose_quat(obs)
+        self._p0 = p0
+        self._R0 = R.from_quat(q0)
+
+        # For reset output transform, we use current pose (same as reset)
+        action_dummy = np.zeros_like(self.env.action_space.sample(), dtype=np.float32)
+        obs = self._transform_observation(obs, q_base_post=q0, action_tcp_executed=action_dummy)
+        return obs, info
+
+    def step(self, action):
+        # q_pre used for action conversion and intervene_action conversion
+        _, q_pre = self._get_base_pose_quat(obs=None)
+
+        # Convert policy TCP-frame action -> base action
+        a_base = self.tcp_action_to_base(action, q_pre)
+
+        # Step underlying env (may override via SpacemouseIntervention)
+        obs, reward, done, truncated, info = self.env.step(a_base)
+
+        # Determine what action was actually executed, in TCP frame
+        executed_tcp = np.asarray(action, dtype=np.float32).copy()
+
+        if self.convert_intervene_action and isinstance(info, dict) and "intervene_action" in info:
+            # Underlying env likely stored base-frame action here — convert to TCP frame for consistency
+            a_exec_base = np.asarray(info["intervene_action"], dtype=np.float32)
+            a_exec_tcp = self.base_action_to_tcp(a_exec_base, q_pre)
+            info["intervene_action"] = a_exec_tcp
+            executed_tcp = a_exec_tcp
+
+        # q_post for rotating observations
+        _, q_post = self._get_base_pose_quat(obs=None)
+
+        obs = self._transform_observation(obs, q_base_post=q_post, action_tcp_executed=executed_tcp)
+        return obs, reward, done, truncated, info
