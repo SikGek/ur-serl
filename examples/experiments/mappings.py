@@ -3,6 +3,7 @@
 # from experiments.object_handover.config import TrainConfig as ObjectHandoverTrainConfig
 # from experiments.egg_flip.config import TrainConfig as EggFlipTrainConfig
 from experiments.box_picking.config import TrainConfig as UR5EArucoPickTrainConfig
+from experiments.door_opening.config import TrainConfig as DoorOpeningTrainConfig
 
 CONFIG_MAPPING = {
                 # "ram_insertion": RAMInsertionTrainConfig,
@@ -10,4 +11,5 @@ CONFIG_MAPPING = {
                 # "object_handover": ObjectHandoverTrainConfig,
                 # "egg_flip": EggFlipTrainConfig,
                 "ur5e_aruco_pick": UR5EArucoPickTrainConfig,
+                "door_opening": DoorOpeningTrainConfig,
                }

@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import os
+import numpy as np
+import jax
+import jax.numpy as jnp
+
+# --- UR5 base config (adjust import path for your repo) ---
+from ur_env.envs.ur5_env import DefaultEnvConfig
+from experiments.config import DefaultTrainingConfig
+
+# --- SERL/HIL-SERL style wrappers ---
+from serl_launcher.wrappers.serl_obs_wrappers import SERLObsWrapper
+from serl_launcher.wrappers.chunking import ChunkingWrapper
+from serl_launcher.networks.reward_classifier import load_classifier_func
+
+# --- Your UR wrappers ---
+from ur_env.envs.wrappers import SpacemouseIntervention
+from experiments.door_opening.wrapper import (
+    UR5EDoorOpenEnv,
+    DoorManualResetWrapper,
+    RewardClassifierTerminateWrapper,
+    GripperPenaltyWrapper,
+    # Optional:
+    # TCPActionRelativeFrame,
+    # RelativeFrame,
+    ToMrpWrapper,
+)
+
+
+class EnvConfig(DefaultEnvConfig):
+    # ---------------- Robot ----------------
+    ROBOT_IP: str = "192.168.56.2"     # <-- set
+    CONTROLLER_HZ: int = 100
+
+    # A safe joint reset pose that starts near the handle (example placeholder)
+    RESET_Q = np.deg2rad(np.array([
+        [ 270.0, -90.0, -120.0, -150.0,  90.0, 180.0 ],
+    ], dtype=np.float32))
+
+    # Randomize initial EE pose slightly (helps generalization)
+    RANDOM_RESET = True
+    RANDOM_XY_RANGE = (0.04,)        # ~4 cm
+    RANDOM_ROT_RANGE = (np.deg2rad(10),)  # ~10 deg about each axis in current reset logic
+
+    # Safety workspace bounds (PLACEHOLDERS — tune!)
+    # low/high are [x,y,z, mrp_x, mrp_y, mrp_z] in your UR5Env
+    ABS_POSE_LIMIT_LOW  = np.array([-0.6, -0.8, 0.05, -0.10, -0.10, -0.20], dtype=np.float32)
+    ABS_POSE_LIMIT_HIGH = np.array([ 0.2, -0.2, 0.60,  0.10,  0.10,  0.20], dtype=np.float32)
+
+    # Action scales: translation (m per step), rotation scale (mrp factor), gripper scale
+    ACTION_SCALE = np.array([0.03, 0.10, 1.0], dtype=np.float32)
+
+    # ---------------- Camera ----------------
+    # IMPORTANT:
+    # If your UR5Env only supports keys like "wrist", you can still name your side camera "wrist".
+    # Otherwise, extend UR5Env image-space creation to accept arbitrary keys.
+    REALSENSE_CAMERAS = {
+        "wrist": "YOUR_SIDE_CAMERA_SERIAL",   # <-- set
+    }
+
+    # Optional: crop function to focus on the door region BEFORE resizing to 128x128.
+    # You can implement this in UR5EDoorOpenEnv.crop_image() (see wrapper code below).
+    # Example ROI numbers are placeholders.
+    IMAGE_CROP = {
+        "wrist": lambda img: img[0:720, 200:1000, :],  # (y0:y1, x0:x1)
+    }
+
+    MAX_EPISODE_LENGTH = 120   # ~12 seconds at 10 Hz
+
+
+class TrainConfig(DefaultTrainingConfig):
+    # --- what the policy sees ---
+    image_keys = ["wrist"]           # “wrist” key is actually your side camera
+    classifier_keys = ["wrist"]      # use same camera for reward since you only have one
+
+    proprio_keys = [
+        "tcp_pose",
+        "tcp_vel",
+        "tcp_force",
+        "tcp_torque",
+        "gripper_pose",     # optional if you expose it
+        # "gripper_object", # optional if you have a sensor
+        "gripper_state",
+    ]
+
+    # --- RL hyperparams (match the paper’s typical settings) ---
+    encoder_type = "resnet-pretrained"
+    discount = 0.98           # good for ~100 step horizons:contentReference[oaicite:19]{index=19}
+    cta_ratio = 2
+    random_steps = 0
+
+    setup_mode = "single-arm-learned-gripper"  # or fixed gripper if you don't want discrete gripper
+
+    # Reward classifier checkpoint folder
+    classifier_ckpt_path = os.path.abspath("classifier_ckpt/door_open_45deg/")
+
+    # Reward classifier decision
+    clf_threshold = 0.8
+    clf_consecutive = 3       # require 3 consecutive frames above threshold
+
+    def get_environment(self, fake_env=False, save_video=False, classifier=True):
+        # ---- Base env ----
+        env = UR5EDoorOpenEnv(
+            fake_env=fake_env,
+            save_video=save_video,
+            config=EnvConfig(),
+            max_episode_length=EnvConfig.MAX_EPISODE_LENGTH,
+            hz=10,                      # 10 Hz like HIL-SERL:contentReference[oaicite:20]{index=20}
+            camera_mode="rgb",
+        )
+
+        # ---- Manual reset for door tasks (recommended unless you have scripted closing) ----
+        # You can remove this if you implement a scripted door-close reset.
+        env = DoorManualResetWrapper(env, prompt_every_reset=True)
+
+        # ---- Human interventions ----
+        if not fake_env:
+            env = SpacemouseIntervention(env)
+
+        # ---- (Optional) Make policy actions TCP-frame consistent ----
+        # If your low-level controller expects base-frame deltas but you want TCP-frame actions:
+        # env = TCPActionRelativeFrame(env)  # converts TCP-frame action -> base-frame action
+
+        # ---- Orientation representation ----
+        env = ToMrpWrapper(env)
+
+        # ---- SERL formatting ----
+        env = SERLObsWrapper(env, proprio_keys=self.proprio_keys)
+
+        # ---- Chunking (if your agent expects it) ----
+        env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
+
+        # ---- Binary reward classifier wrapper ----
+        if classifier:
+            clf = load_classifier_func(
+                key=jax.random.PRNGKey(0),
+                sample=env.observation_space.sample(),
+                image_keys=self.classifier_keys,
+                checkpoint_path=self.classifier_ckpt_path,
+            )
+
+            def prob_func(obs):
+                logits = clf(obs)
+                logit0 = jnp.ravel(jnp.asarray(logits))[0]
+                return jax.nn.sigmoid(logit0)
+
+            env = RewardClassifierTerminateWrapper(
+                env,
+                prob_func,
+                threshold=self.clf_threshold,
+                consecutive=self.clf_consecutive,
+                target_hz=10,
+                trunc_penalty=-1.0,
+                pass_env_reward=False,
+            )
+
+        # ---- Optional gripper penalty (discourage spam) ----
+        env = GripperPenaltyWrapper(env, penalty=-0.02)
+
+        return env
