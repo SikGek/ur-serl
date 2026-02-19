@@ -453,7 +453,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
             expert_a = np.concatenate((expert_a, gripper_action), axis=0)
 
         if time.time() - self.last_intervene < 0.5:
-            # expert_a = self.adapt_spacemouse_output(expert_a)
+            expert_a = self.adapt_spacemouse_output(expert_a)
             return expert_a, True
 
         return action, False
@@ -472,7 +472,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
     def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
             position = self.unwrapped.curr_pos
-            
+            print(position)
             # Extract the actual TCP orientation as a quaternion (the last 4 elements)
             tcp_quat = position[3:] 
             tcp_rot = R.from_quat(tcp_quat)

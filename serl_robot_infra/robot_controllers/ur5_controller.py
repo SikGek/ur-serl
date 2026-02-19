@@ -71,7 +71,8 @@ class UrImpedanceController(threading.Thread):
         self.curr_force = np.zeros((6,), dtype=np.float32)
 
         # self.reset_Q = np.array([np.pi / 2., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.], dtype=np.float32)  # reset state in Joint Space
-        self.reset_Q = np.array([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
+        # self.reset_Q = np.array([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
+        self.reset_Q = np.array([272.0, -91.0, -130.0, -166.0, 270.0, 180.0])
         self.reset_Pose = np.zeros_like(self.reset_Q)
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
@@ -110,7 +111,7 @@ class UrImpedanceController(threading.Thread):
     async def start_ur_interfaces(self, gripper=True):
         self.ur_control = RTDEControlInterface(self.robot_ip)
         self.ur_receive = RTDEReceiveInterface(self.robot_ip)
-        self.ur_control.setTcp([0.0, 0.0, 0.15, 0.0, 0.0, 0.0])
+        self.ur_control.setTcp([0.0, 0.0, 0.16, 0.0, 0.0, 0.0])
         # port = getattr(self.config, "GRIPPER_USB_PORT", "auto")
         # slave = getattr(self.config, "GRIPPER_SLAVE_ADDRESS", 9)
         if gripper:
@@ -160,6 +161,7 @@ class UrImpedanceController(threading.Thread):
 
     def set_target_pos(self, target_pos: np.ndarray):
         if target_pos.shape == (7,):
+            print("\n", target_pos, "\n")
             target_orientation = target_pos[3:]
         elif target_pos.shape == (6,):
             target_orientation = rotvec_2_quat(target_pos[3:])
@@ -359,13 +361,15 @@ class UrImpedanceController(threading.Thread):
         self.ur_control.speedStop(a=1.)
         # print("\n\n\n", self.reset_Pose, "\n\n\n", self.reset_Q, "\n\n\n")
         if self.reset_Pose.std() > 0.001:
-            success = success and  self.ur_control.moveL(self.reset_Pose, speed=0.5, acceleration=0.3)
+
             self.print(f"[RIC] moving to {self.reset_Pose} with moveL (task space)", both=self.verbose)
+            success = success and  self.ur_control.moveL(self.reset_Pose, speed=0.5, acceleration=0.3)
             self.reset_Pose[:] = 0.
         else:
             # then move to desired Jointspace position
-            success = success and self.ur_control.moveJ(self.reset_Q, speed=0.5, acceleration=0.3)
+            
             self.print(f"[RIC] moving to {self.reset_Q} with moveJ (joint space)", both=self.verbose)
+            success = success and self.ur_control.moveJ(self.reset_Q, speed=0.5, acceleration=0.3)
 
         time.sleep(0.1)     # wait for 100ms
         await self._update_robot_state()
@@ -384,7 +388,6 @@ class UrImpedanceController(threading.Thread):
         await self.start_ur_interfaces(gripper=True)
 
         self.ur_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
-
         try:
             dt = 1. / self.frequency
             self.ur_control.zeroFtSensor()
@@ -395,6 +398,7 @@ class UrImpedanceController(threading.Thread):
             self._is_ready.set()
 
             while not self.stopped():
+                # input("Enter")
                 if self._reset.is_set():
                     await self._update_robot_state()
                     await self._go_to_reset_pose()
@@ -455,7 +459,8 @@ class UrImpedanceController(threading.Thread):
 
             # move to real home
             pi = 3.1415
-            reset_Q = np.deg2rad([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
+            # reset_Q = np.deg2rad([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
+            reset_Q = np.deg2rad([272.0, -91.0, -130.0, -166.0, 270.0, 180.0])
             self.ur_control.moveJ(reset_Q, speed=0.5, acceleration=0.5)
 
             # terminate

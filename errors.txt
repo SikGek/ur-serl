@@ -260,3 +260,6 @@ Traceback (most recent call last):
     return super(MemoryEfficientReplayBufferDataStore, self).sample(
   File "/home/user/ur-serl/serl_launcher/serl_launcher/data/memory_efficient_replay_buffer.py", line 158, in sample
     obs_pixels = obs_pixels.transpose((0, 4, 1, 2, 3))
+
+
+ [-0.1284 -0.2405  0.3429  0.5621 -0.6031  0.4161  0.3838]

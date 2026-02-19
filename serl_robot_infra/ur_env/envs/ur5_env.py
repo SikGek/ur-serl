@@ -135,25 +135,25 @@ class UR5Env(gym.Env):
         self.curr_force = np.zeros((3,), dtype=np.float32)
         self.curr_torque = np.zeros((3,), dtype=np.float32)
         
-        self.pose_estimation_ip = config.POSE_ESTIMATION_IP
-        self.pose_est = config.POSE_ESTIMATION
+        # self.pose_estimation_ip = config.POSE_ESTIMATION_IP
+        # self.pose_est = config.POSE_ESTIMATION
         # self.pose_estimation_ip = None
         # self. pose_est = None
-        self.WF_rot = config.WF_rot
+        # self.WF_rot = config.WF_rot
         # self.WF_rot = None
         self.residual_learning_inference = True
-        self.box_error = config.BOX_ERROR
-        self.low_pass_filter_k = config.LOW_PASS_FILTER
+        # self.box_error = config.BOX_ERROR
+        # self.low_pass_filter_k = config.LOW_PASS_FILTER
         
         # boxes
-        self.box_pose_est = BoxPoseEstimation(self.pose_estimation_ip) if config.POSE_ESTIMATION else None
+        # self.box_pose_est = BoxPoseEstimation(self.pose_estimation_ip) if config.POSE_ESTIMATION else None
         # self.box_pose_est = None
-        self.goal_pose = np.zeros((3,), dtype=np.float32)
+        # self.goal_pose = np.zeros((3,), dtype=np.float32)
         self.box_position = np.zeros((3,), dtype=np.float32)
         self.box_orientation = np.zeros((3,), dtype=np.float32)
         self.init_box_orientation = np.zeros((3,), dtype=np.float32)
-        self._get_goal_pose()
-        self.rotation_generalization = config.ROTATION_GENERALIZATION
+        # self._get_goal_pose()
+        # self.rotation_generalization = config.ROTATION_GENERALIZATION
 
         self.gripper_state = np.zeros((2,), dtype=np.float32)
         self.random_reset = config.RANDOM_RESET
@@ -203,6 +203,10 @@ class UR5Env(gym.Env):
                 )
             if "wrist_2" in config.REALSENSE_CAMERAS.keys():
                 image_space_definition["wrist_2"] = gym.spaces.Box(
+                    0, 255, shape=(128, 128, channel), dtype=np.uint8
+                )
+            else:
+                image_space_definition["shoulder"] = gym.spaces.Box(
                     0, 255, shape=(128, 128, channel), dtype=np.uint8
                 )
 
@@ -332,6 +336,7 @@ class UR5Env(gym.Env):
         gripper_action = action[6] * self.action_scale[2]
 
         safe_pos = self.clip_safety_box(next_pos)
+        # print(next_po)
         self._send_pos_command(safe_pos)
         self._send_gripper_command(gripper_action)
 
@@ -390,7 +395,8 @@ class UR5Env(gym.Env):
             self.resetQ[:] = np.roll(self.resetQ, -1, axis=0)  # roll one (not random)
         else:
             raise ValueError(f"invalid resetQ dimension: {self.resetQ.shape}")
-
+        # print(np.rad2deg(reset_Q))
+        # input("Enter")
         self._send_reset_command(reset_Q)
 
         while not self.controller.is_reset():
@@ -487,7 +493,7 @@ class UR5Env(gym.Env):
         self.cycle_count += 1
         if self.save_video:
             self.save_video_recording()
-
+        # input("enter")
         shift = self.go_to_rest()
         self.curr_path_length = 0
         # print(self.last_action.shape)
@@ -721,10 +727,10 @@ class UR5Env(gym.Env):
         if self.camera_mode is not None:
             images = self.get_image()
             
-        if self.pose_est:
-            self._update_box_pos_estimate()
-        else:
-            self.box_position = np.array([0.5, 0.5, 0.5])
+        # if self.pose_est:
+        #     self._update_box_pos_estimate()
+        # else:
+        #     self.box_position = np.array([0.5, 0.5, 0.5])
         
         self._update_currpos()
         state_observation = {

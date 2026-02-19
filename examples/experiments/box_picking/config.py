@@ -56,7 +56,12 @@ class EnvConfig(DefaultEnvConfig):
             "dim": (1280, 720),
         },
     }
-
+    REALSENSE_CAMERAS = {
+        "wrist": {
+            "serial_number": "239122070813",  
+            "dim": (1280, 720),
+        },
+    }
     # Optional: per-camera crop functions
     # IMAGE_CROP = {
     #     "wrist": lambda img: img[:, 124:604, :],

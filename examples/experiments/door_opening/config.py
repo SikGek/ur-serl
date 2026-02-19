@@ -35,7 +35,8 @@ class EnvConfig(DefaultEnvConfig):
 
     # A safe joint reset pose that starts near the handle (example placeholder)
     RESET_Q = np.deg2rad(np.array([
-        [ 270.0, -90.0, -120.0, -150.0,  90.0, 180.0 ],
+        # [271.07, -93.98, -122.14, -166.376, 270.78, 180.0],
+        [272.0, -91.0, -130.0, -166.0, 270.0, 180.0]
     ], dtype=np.float32))
 
     # Randomize initial EE pose slightly (helps generalization)
@@ -49,30 +50,41 @@ class EnvConfig(DefaultEnvConfig):
     ABS_POSE_LIMIT_HIGH = np.array([ 0.2, -0.2, 0.60,  0.10,  0.10,  0.20], dtype=np.float32)
 
     # Action scales: translation (m per step), rotation scale (mrp factor), gripper scale
-    ACTION_SCALE = np.array([0.03, 0.10, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.15, 0.15, 1.0], dtype=np.float32)
 
     # ---------------- Camera ----------------
     # IMPORTANT:
     # If your UR5Env only supports keys like "wrist", you can still name your side camera "wrist".
     # Otherwise, extend UR5Env image-space creation to accept arbitrary keys.
     REALSENSE_CAMERAS = {
-        "wrist": "YOUR_SIDE_CAMERA_SERIAL",   # <-- set
+        "shoulder": {
+            "serial_number": "239122070813",  
+            "dim": (1280, 720),
+        },
     }
-
     # Optional: crop function to focus on the door region BEFORE resizing to 128x128.
     # You can implement this in UR5EDoorOpenEnv.crop_image() (see wrapper code below).
     # Example ROI numbers are placeholders.
-    IMAGE_CROP = {
-        "wrist": lambda img: img[0:720, 200:1000, :],  # (y0:y1, x0:x1)
-    }
+    # IMAGE_CROP = {
+    #     "wrist": lambda img: img[0:720, 200:1000, :],  # (y0:y1, x0:x1)
+    # }
 
-    MAX_EPISODE_LENGTH = 120   # ~12 seconds at 10 Hz
+    MAX_EPISODE_LENGTH = 250
+
+    GRIPPER_TIMEOUT = 5000  # in milliseconds
+    ERROR_DELTA: float = 0.05
+    FORCEMODE_DAMPING: float = 0.8  # faster
+    FORCEMODE_TASK_FRAME = np.zeros(6)
+    FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
+    FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
+    GRIPPER_USB_PORT = "/dev/ttyUSB0"
+    GRIPPER_SLAVE_ID = 9
 
 
 class TrainConfig(DefaultTrainingConfig):
     # --- what the policy sees ---
-    image_keys = ["wrist"]           # “wrist” key is actually your side camera
-    classifier_keys = ["wrist"]      # use same camera for reward since you only have one
+    image_keys = ["shoulder"]           # “wrist” key is actually your side camera
+    classifier_keys = ["shoulder"]      # use same camera for reward since you only have one
 
     proprio_keys = [
         "tcp_pose",
@@ -112,7 +124,7 @@ class TrainConfig(DefaultTrainingConfig):
 
         # ---- Manual reset for door tasks (recommended unless you have scripted closing) ----
         # You can remove this if you implement a scripted door-close reset.
-        env = DoorManualResetWrapper(env, prompt_every_reset=True)
+        env = DoorManualResetWrapper(env, prompt_every_reset=False)
 
         # ---- Human interventions ----
         if not fake_env:
