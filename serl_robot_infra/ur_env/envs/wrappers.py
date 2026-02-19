@@ -471,25 +471,40 @@ class SpacemouseIntervention(gym.ActionWrapper):
         return np.array(expert_a, dtype=np.float32)
 
     def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
-        """
-        Input:
-        - expert_a: spacemouse raw output
-        Output:
-        - expert_a: spacemouse output adapted to force space (action)
-        """
+            position = self.unwrapped.curr_pos
+            
+            # Extract the actual TCP orientation as a quaternion (the last 4 elements)
+            tcp_quat = position[3:] 
+            tcp_rot = R.from_quat(tcp_quat)
+            
+            action[:6] *= self.invert_axes
+            
+            # Apply the actual gripper orientation to the spacemouse actions
+            action[:3] = tcp_rot.apply(action[:3])  # Translation local to the gripper tip
+            action[3:6] = tcp_rot.apply(action[3:6])  # Rotation local to the gripper tip
 
-        # position = super().get_wrapper_attr("curr_pos")  # get position from ur_env
-        position = self.unwrapped.curr_pos
-        z_angle = np.arctan2(position[1], position[0])  # get first joint angle
+            return action
 
-        z_rot = R.from_rotvec(np.array([0, 0, z_angle]))
-        action[:6] *= self.invert_axes  # if some want to be inverted
-        action[:3] = z_rot.apply(action[:3])  # z rotation invariant translation
+    # def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
+    #     """
+    #     Input:
+    #     - expert_a: spacemouse raw output
+    #     Output:
+    #     - expert_a: spacemouse output adapted to force space (action)
+    #     """
 
-        # TODO add tcp orientation to the equation (extract z rotation from tcp pose)
-        action[3:6] = z_rot.apply(action[3:6])  # z rotation invariant rotation
+    #     # position = super().get_wrapper_attr("curr_pos")  # get position from ur_env
+    #     position = self.unwrapped.curr_pos
+    #     z_angle = np.arctan2(position[1], position[0])  # get first joint angle
 
-        return action
+    #     z_rot = R.from_rotvec(np.array([0, 0, z_angle]))
+    #     action[:6] *= self.invert_axes  # if some want to be inverted
+    #     action[:3] = z_rot.apply(action[:3])  # z rotation invariant translation
+
+    #     # TODO add tcp orientation to the equation (extract z rotation from tcp pose)
+    #     action[3:6] = z_rot.apply(action[3:6])  # z rotation invariant rotation
+
+    #     return action
 
     def step(self, action):
         new_action, replaced = self.action(action)
