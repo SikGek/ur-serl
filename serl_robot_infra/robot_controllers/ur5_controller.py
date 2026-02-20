@@ -46,7 +46,7 @@ class UrImpedanceController(threading.Thread):
             config = default_config
         
         super(UrImpedanceController, self).__init__(*args, **kwargs)
-
+########################
         #gains for DLS
         # Gains map pose error -> desired TCP twist (m/s, rad/s)
         self.kp_pos = 2.0
@@ -55,17 +55,17 @@ class UrImpedanceController(threading.Thread):
         self.kd_rot = 0.3
 
         # Limits for safety
-        self.max_tcp_v = 0.15     # m/s
+        self.max_tcp_v = 1.0     # m/s
         self.max_tcp_w = 1.0      # rad/s
         self.max_qd    = 1.5      # rad/s
-        self.servo_gain = 900.
+        self.servo_gain = 2000.
         self.lookahead = 0.08
 
         # DLS damping parameters
         self.sigma_thresh = 0.02     # tune
         self.lam_min = 0.01
         self.lam_max = 0.25
-
+########################
         self._stop = threading.Event()
         self._reset = threading.Event()
         self._is_ready = threading.Event()
@@ -95,7 +95,7 @@ class UrImpedanceController(threading.Thread):
         if hasattr(config, 'RESET_Q'):
             self.reset_Q = config.RESET_Q.flatten() # Flatten fixes the 2D array bug!
         else:
-            self.reset_Q = np.deg2rad(np.array([-88.0, -91.0, -130.0, -166.0, -90.0, 0.0], dtype=np.float32))  # reset state in Joint Space
+            self.reset_Q = np.deg2rad(np.array([272.0, -91.0, -130.0, -166.0, 270.0, 0.0], dtype=np.float32))  # reset state in Joint Space
         self.reset_Pose = np.zeros_like(self.reset_Q)
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
@@ -305,6 +305,7 @@ class UrImpedanceController(threading.Thread):
 
         self.ur_control.forceModeStop()
         self.ur_control.servoStop()
+        self.ur_control.speedStop()
 
         print("[RIC] plotting")
         real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
@@ -368,6 +369,7 @@ class UrImpedanceController(threading.Thread):
     async def _go_to_reset_pose(self):
         # self.ur_control.forceModeStop()
         self.ur_control.servoStop()
+        self.ur_control.speedStop()
         # first disable vaccum gripper
         if self.robotiq_gripper:
             await self.send_gripper_command(force_release=True)
@@ -468,97 +470,56 @@ class UrImpedanceController(threading.Thread):
                     self.plot()
 
                 # calculate force
-                # force = self._calculate_force()
+                force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
                 self.print(f" p:{self.curr_pos}   f:{self.curr_force_lowpass}   gr:{self.gripper_state}")  # log to file
-                # Update state already done: self.curr_pos, self.curr_vel, self.curr_Q
+                # Update state already done: self.curr_pos, self.curr_vel, self.curr_
+           ##############################################
+                # target_pos = self.get_target_pos(copy=True)
+                # curr_pos = self.curr_pos.copy()
 
-                ###############################
-                # ... inside your run_async() while loop ...
-                
-                # 1. Calculate the desired Cartesian "virtual force" (your existing function)
-                virtual_force = self._calculate_force()
-                
-                # 2. Admittance Law: Convert virtual force to desired Cartesian velocity.
-                # You act as a damper: Velocity = Force / Damping_Coefficient
-                # You may need different damping for translation vs rotation.
-                linear_damping = 500.0  # N / (m/s) - TUNE THIS
-                angular_damping = 50.0  # Nm / (rad/s) - TUNE THIS
-                
-                desired_cartesian_vel = np.zeros(6)
-                desired_cartesian_vel[:3] = virtual_force[:3] / linear_damping
-                desired_cartesian_vel[3:] = virtual_force[3:] / angular_damping
-                
-                # 3. Get the current Jacobian directly from the UR5e
-                jacobian_flat = self.ur_receive.getActualJacobian()
-                
-                # 4. Calculate the DLS inverse (this prevents the singularity crash)
-                J_dls = self.calculate_dls_inverse(jacobian_flat, damping_factor=0.1)
-                
-                # 5. Convert Cartesian velocities to Joint velocities
-                desired_joint_vels = J_dls @ desired_cartesian_vel
-                
-                # 6. Send the joint velocities to the robot using speedJ
-                # Using dt ensures the command is valid for this control cycle
-                t_start = self.ur_control.initPeriod()
-                
-                # We use speedJ instead of forceMode
-                # acceleration parameter dictates how fast joints reach the velocity
-                self.ur_control.speedJ(desired_joint_vels.tolist(), acceleration=2.0, time=dt)
-                
-                if self.robotiq_gripper:
-                    await self.send_gripper_command()
+                # # 1) pose error
+                # e_p, e_r = self._pose_error(target_pos, curr_pos)
 
-                self.ur_control.waitPeriod(t_start)
-                ####################################
+                # # 2) desired twist (TCP velocity)
+                # v = self.kp_pos * e_p - self.kd_pos * self.curr_vel[:3]
+                # w = self.kp_rot * e_r - self.kd_rot * self.curr_vel[3:]
 
+                # # clamp twist
+                # v = np.clip(v, -self.max_tcp_v, self.max_tcp_v)
+                # w = np.clip(w, -self.max_tcp_w, self.max_tcp_w)
+                # xdot = np.concatenate([v, w], axis=0)  # (6,)
 
-                '''                
-                target_pos = self.get_target_pos(copy=True)
-                curr_pos = self.curr_pos.copy()
+                # # 3) Jacobian + DLS
+                # J = np.array(self.ur_control.getJacobian()).reshape(6, 6)  # ur_rtde provides this :contentReference[oaicite:7]{index=7}
+                # s = np.linalg.svd(J, compute_uv=False)
+                # sigma_min = float(s[-1])
+                # lam = self._adaptive_lambda(sigma_min)
 
-                # 1) pose error
-                e_p, e_r = self._pose_error(target_pos, curr_pos)
+                # J_pinv = self._dls_pinv(J, lam)
+                # qdot = J_pinv @ xdot
 
-                # 2) desired twist (TCP velocity)
-                v = self.kp_pos * e_p - self.kd_pos * self.curr_vel[:3]
-                w = self.kp_rot * e_r - self.kd_rot * self.curr_vel[3:]
+                # # clamp joint speeds for safety
+                # qdot = np.clip(qdot, -self.max_qd, self.max_qd)
 
-                # clamp twist
-                v = np.clip(v, -self.max_tcp_v, self.max_tcp_v)
-                w = np.clip(w, -self.max_tcp_w, self.max_tcp_w)
-                xdot = np.concatenate([v, w], axis=0)  # (6,)
-
-                # 3) Jacobian + DLS
-                J = np.array(self.ur_control.getJacobian()).reshape(6, 6)  # ur_rtde provides this :contentReference[oaicite:7]{index=7}
-                s = np.linalg.svd(J, compute_uv=False)
-                sigma_min = float(s[-1])
-                lam = self._adaptive_lambda(sigma_min)
-
-                J_pinv = self._dls_pinv(J, lam)
-                qdot = J_pinv @ xdot
-
-                # clamp joint speeds for safety
-                qdot = np.clip(qdot, -self.max_qd, self.max_qd)
-
-                # 4) Send joint servo
-                dt = 1.0 / self.frequency
-                q_cmd = (self.curr_Q + qdot * dt).tolist()
-                t_start = self.ur_control.initPeriod()
-                # servoJ runs joint-space servo (no forceMode involved) :contentReference[oaicite:8]{index=8}
-                self.ur_control.servoJ(
-                    q_cmd,
-                    1.0,
-                    1.0,
-                    dt,
-                    self.lookahead,
-                    self.servo_gain,
-                )'''
-
+                # # 4) Send joint servo
+                # dt = 1.0 / self.frequency
+                # q_cmd = (self.curr_Q + qdot * dt).tolist()
+                # t_start = self.ur_control.initPeriod()
+                # # servoJ runs joint-space servo (no forceMode involved) :contentReference[oaicite:8]{index=8}
+                # self.ur_control.servoJ(
+                #     q_cmd,
+                #     1.0,
+                #     1.0,
+                #     dt,
+                #     self.lookahead,
+                #     self.servo_gain,
+                # )
+#####################################################
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
                     
-                '''                # send command to robot
+                               # send command to robot
                 t_start = self.ur_control.initPeriod()
                 fm_successful = self.ur_control.forceMode(
                     self.fm_task_frame,
@@ -569,7 +530,7 @@ class UrImpedanceController(threading.Thread):
                 )
                 if not fm_successful:  # truncate if the robot ends up in a singularity
                     await self.restart_ur_interface()
-                    await self._go_to_reset_pose()'''
+                    await self._go_to_reset_pose()
 
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
@@ -588,6 +549,7 @@ class UrImpedanceController(threading.Thread):
             # mandatory cleanup
             self.ur_control.forceModeStop()
             self.ur_control.servoStop()
+            self.ur_control.speedStop()
 
             # release gripper
             if self.robotiq_gripper:
