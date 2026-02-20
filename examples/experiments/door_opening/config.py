@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 # --- UR5 base config (adjust import path for your repo) ---
 from ur_env.envs.ur5_env import DefaultEnvConfig
+from ur_env.envs.relative_env import RelativeFrame
 from experiments.config import DefaultTrainingConfig
 
 # --- SERL/HIL-SERL style wrappers ---
@@ -132,7 +133,7 @@ class TrainConfig(DefaultTrainingConfig):
         # ---- Human interventions ----
         if not fake_env:
             env = SpacemouseIntervention(env)
-
+        env = RelativeFrame(env)
         # ---- (Optional) Make policy actions TCP-frame consistent ----
         # If your low-level controller expects base-frame deltas but you want TCP-frame actions:
         # env = TCPActionRelativeFrame(env)  # converts TCP-frame action -> base-frame action
