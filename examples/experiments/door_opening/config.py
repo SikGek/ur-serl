@@ -37,7 +37,7 @@ class EnvConfig(DefaultEnvConfig):
     # A safe joint reset pose that starts near the handle (example placeholder)
     RESET_Q = np.deg2rad(np.array([
         # [271.07, -93.98, -122.14, -166.376, 270.78, 180.0],
-        [272.0, -58.0, -150.0, -156.0, 270.0, 0.0],
+        [272.0, -77.0, -130.0, -153.0, 270.0, 0.0],
         # [180.0, -80.0, -130.0, -166.0, 270.0, 180.0],
     ], dtype=np.float32))
 
@@ -54,7 +54,7 @@ class EnvConfig(DefaultEnvConfig):
 
     # 2. Action Scales:
     # If the robot feels "sluggish" while opening, increase the translation scale.
-    ACTION_SCALE = np.array([0.10, 0.15, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.1, 0.15, 1.0], dtype=np.float32)
 
     # ---------------- Camera ----------------
     # IMPORTANT:
@@ -77,7 +77,7 @@ class EnvConfig(DefaultEnvConfig):
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.2  # faster
+    FORCEMODE_DAMPING: float = 0.0  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     # FORCEMODE_SELECTION_VECTOR = np.array([1,1,1,0,0,0], dtype=np.int8)
