@@ -37,8 +37,8 @@ class EnvConfig(DefaultEnvConfig):
     # A safe joint reset pose that starts near the handle (example placeholder)
     RESET_Q = np.deg2rad(np.array([
         # [271.07, -93.98, -122.14, -166.376, 270.78, 180.0],
-        # [272.0, -91.0, -130.0, -166.0, 270.0, 180.0],
-        [-88.0, -91.0, -130.0, -166.0, -90.0, 180.0],
+        [272.0, -58.0, -150.0, -156.0, 270.0, 0.0],
+        # [180.0, -80.0, -130.0, -166.0, 270.0, 180.0],
     ], dtype=np.float32))
 
     # Randomize initial EE pose slightly (helps generalization)
@@ -77,9 +77,10 @@ class EnvConfig(DefaultEnvConfig):
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.8  # faster
+    FORCEMODE_DAMPING: float = 0.2  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
-    FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
+    # FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
+    FORCEMODE_SELECTION_VECTOR = np.array([1,1,1,0,0,0], dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
     GRIPPER_USB_PORT = "/dev/ttyUSB0"
     GRIPPER_SLAVE_ID = 9

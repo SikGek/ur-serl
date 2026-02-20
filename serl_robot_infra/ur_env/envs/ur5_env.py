@@ -335,9 +335,9 @@ class UR5Env(gym.Env):
 
         gripper_action = action[6] * self.action_scale[2]
 
-        safe_pos = self.clip_safety_box(next_pos)
+        # safe_pos = self.clip_safety_box(next_pos)
         # print(next_po)
-        self._send_pos_command(safe_pos)
+        self._send_pos_command(next_pos)
         self._send_gripper_command(gripper_action)
 
         self.curr_path_length += 1
