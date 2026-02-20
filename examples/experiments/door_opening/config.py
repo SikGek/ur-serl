@@ -36,13 +36,15 @@ class EnvConfig(DefaultEnvConfig):
     # A safe joint reset pose that starts near the handle (example placeholder)
     RESET_Q = np.deg2rad(np.array([
         # [271.07, -93.98, -122.14, -166.376, 270.78, 180.0],
-        [272.0, -91.0, -130.0, -166.0, 270.0, 180.0]
+        # [272.0, -91.0, -130.0, -166.0, 270.0, 180.0],
+        [-88.0, -91.0, -130.0, -166.0, -90.0, 180.0],
     ], dtype=np.float32))
 
     # Randomize initial EE pose slightly (helps generalization)
-    RANDOM_RESET = True
+    RANDOM_RESET = False
     RANDOM_XY_RANGE = (0.04,)        # ~4 cm
-    RANDOM_ROT_RANGE = (np.deg2rad(10),)  # ~10 deg about each axis in current reset logic
+    RANDOM_ROT_RANGE = (np.tan(np.deg2rad(10)/4),)
+  # ~10 deg about each axis in current reset logic
 
     # Safety workspace bounds (PLACEHOLDERS — tune!)
     # low/high are [x,y,z, mrp_x, mrp_y, mrp_z] in your UR5Env
@@ -50,7 +52,7 @@ class EnvConfig(DefaultEnvConfig):
     ABS_POSE_LIMIT_HIGH = np.array([ 0.2, -0.2, 0.60,  0.10,  0.10,  0.20], dtype=np.float32)
 
     # Action scales: translation (m per step), rotation scale (mrp factor), gripper scale
-    ACTION_SCALE = np.array([0.15, 0.15, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.05, 0.1, 1.0], dtype=np.float32)
 
     # ---------------- Camera ----------------
     # IMPORTANT:

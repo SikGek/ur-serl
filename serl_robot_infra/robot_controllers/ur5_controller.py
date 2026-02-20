@@ -72,7 +72,10 @@ class UrImpedanceController(threading.Thread):
 
         # self.reset_Q = np.array([np.pi / 2., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.], dtype=np.float32)  # reset state in Joint Space
         # self.reset_Q = np.array([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
-        self.reset_Q = np.array([272.0, -91.0, -130.0, -166.0, 270.0, 180.0])
+        if hasattr(config, 'RESET_Q'):
+            self.reset_Q = config.RESET_Q.flatten() # Flatten fixes the 2D array bug!
+        else:
+            self.reset_Q = np.deg2rad(np.array([-88.0, -91.0, -130.0, -166.0, -90.0, 180.0], dtype=np.float32))  # reset state in Joint Space
         self.reset_Pose = np.zeros_like(self.reset_Q)
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
