@@ -427,7 +427,16 @@ class UrImpedanceController(threading.Thread):
         ratio = (self.sigma_thresh / max(sigma_min, 1e-6)) - 1.0
         lam = self.lam_min + ratio * (self.lam_max - self.lam_min)
         return float(np.clip(lam, self.lam_min, self.lam_max))
-
+    
+    def calculate_dls_inverse(self, jacobian_flat, damping_factor=0.05):
+        # ur_rtde returns the Jacobian as a flat list of 36 floats
+        J = np.array(jacobian_flat).reshape(6, 6)
+        lambda_sq = damping_factor ** 2
+        I = np.eye(6)
+        
+        # Calculate DLS pseudo-inverse
+        J_inv = J.T @ np.linalg.inv(J @ J.T + lambda_sq * I)
+        return J_inv
 
     async def run_async(self):
         await self.start_ur_interfaces(gripper=True)
@@ -464,6 +473,47 @@ class UrImpedanceController(threading.Thread):
                 self.print(f" p:{self.curr_pos}   f:{self.curr_force_lowpass}   gr:{self.gripper_state}")  # log to file
                 # Update state already done: self.curr_pos, self.curr_vel, self.curr_Q
 
+                ###############################
+                # ... inside your run_async() while loop ...
+                
+                # 1. Calculate the desired Cartesian "virtual force" (your existing function)
+                virtual_force = self._calculate_force()
+                
+                # 2. Admittance Law: Convert virtual force to desired Cartesian velocity.
+                # You act as a damper: Velocity = Force / Damping_Coefficient
+                # You may need different damping for translation vs rotation.
+                linear_damping = 500.0  # N / (m/s) - TUNE THIS
+                angular_damping = 50.0  # Nm / (rad/s) - TUNE THIS
+                
+                desired_cartesian_vel = np.zeros(6)
+                desired_cartesian_vel[:3] = virtual_force[:3] / linear_damping
+                desired_cartesian_vel[3:] = virtual_force[3:] / angular_damping
+                
+                # 3. Get the current Jacobian directly from the UR5e
+                jacobian_flat = self.ur_receive.getActualJacobian()
+                
+                # 4. Calculate the DLS inverse (this prevents the singularity crash)
+                J_dls = self.calculate_dls_inverse(jacobian_flat, damping_factor=0.1)
+                
+                # 5. Convert Cartesian velocities to Joint velocities
+                desired_joint_vels = J_dls @ desired_cartesian_vel
+                
+                # 6. Send the joint velocities to the robot using speedJ
+                # Using dt ensures the command is valid for this control cycle
+                t_start = self.ur_control.initPeriod()
+                
+                # We use speedJ instead of forceMode
+                # acceleration parameter dictates how fast joints reach the velocity
+                self.ur_control.speedJ(desired_joint_vels.tolist(), acceleration=2.0, time=dt)
+                
+                if self.robotiq_gripper:
+                    await self.send_gripper_command()
+
+                self.ur_control.waitPeriod(t_start)
+                ####################################
+
+
+                '''                
                 target_pos = self.get_target_pos(copy=True)
                 curr_pos = self.curr_pos.copy()
 
@@ -503,23 +553,23 @@ class UrImpedanceController(threading.Thread):
                     dt,
                     self.lookahead,
                     self.servo_gain,
-                )
-            
+                )'''
+
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
-
-                # # send command to robot
-                # t_start = self.ur_control.initPeriod()
-                # fm_successful = self.ur_control.forceMode(
-                #     self.fm_task_frame,
-                #     self.fm_selection_vector,
-                #     force,
-                #     2,
-                #     self.fm_limits
-                # )
-                # if not fm_successful:  # truncate if the robot ends up in a singularity
-                #     await self.restart_ur_interface()
-                #     await self._go_to_reset_pose()
+                    
+                '''                # send command to robot
+                t_start = self.ur_control.initPeriod()
+                fm_successful = self.ur_control.forceMode(
+                    self.fm_task_frame,
+                    self.fm_selection_vector,
+                    force,
+                    2,
+                    self.fm_limits
+                )
+                if not fm_successful:  # truncate if the robot ends up in a singularity
+                    await self.restart_ur_interface()
+                    await self._go_to_reset_pose()'''
 
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
