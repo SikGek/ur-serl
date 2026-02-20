@@ -15,23 +15,30 @@ flags.DEFINE_integer("successes_needed", 250, "Number of successful transistions
 
 
 success_key = False
+fail_key = False
 def on_press(key):
     global success_key
+    global fail_key
     try:
         if str(key) == 'Key.space':
             success_key = True
     except AttributeError:
         pass
+    try:
+        if str(key) == 'Key.esc':
+            fail_key = True
+    except AttributeError:
+        pass
 
 def main(_):
     global success_key
+    global fail_key
     listener = keyboard.Listener(
         on_press=on_press)
     listener.start()
     assert FLAGS.exp_name in CONFIG_MAPPING, 'Experiment folder not found.'
     config = CONFIG_MAPPING[FLAGS.exp_name]()
     env = config.get_environment(fake_env=False, save_video=False, classifier=False)
-    exit()
     obs, _ = env.reset()
     successes = []
     failures = []
@@ -60,11 +67,12 @@ def main(_):
             successes.append(transition)
             pbar.update(1)
             success_key = False
-        else:
+        elif fail_key:
             failures.append(transition)
+            fail_key = False
 
-        if done or truncated:
-            obs, _ = env.reset()
+    # if done or truncated:
+    obs, _ = env.reset()
 
     if not os.path.exists("./classifier_data"):
         os.makedirs("./classifier_data")
