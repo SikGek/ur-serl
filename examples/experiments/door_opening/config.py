@@ -48,11 +48,12 @@ class EnvConfig(DefaultEnvConfig):
 
     # Safety workspace bounds (PLACEHOLDERS — tune!)
     # low/high are [x,y,z, mrp_x, mrp_y, mrp_z] in your UR5Env
-    ABS_POSE_LIMIT_LOW  = np.array([-0.6, -0.8, 0.05, -0.10, -0.10, -0.20], dtype=np.float32)
-    ABS_POSE_LIMIT_HIGH = np.array([ 0.2, -0.2, 0.60,  0.10,  0.10,  0.20], dtype=np.float32)
+    ABS_POSE_LIMIT_LOW  = np.array([-0.6, -0.9, 0.05, -0.5, -0.5, -0.5], dtype=np.float32)
+    ABS_POSE_LIMIT_HIGH = np.array([ 0.5, -0.1, 0.60,  0.5,  0.5,  0.5], dtype=np.float32)
 
-    # Action scales: translation (m per step), rotation scale (mrp factor), gripper scale
-    ACTION_SCALE = np.array([0.05, 0.1, 1.0], dtype=np.float32)
+    # 2. Action Scales:
+    # If the robot feels "sluggish" while opening, increase the translation scale.
+    ACTION_SCALE = np.array([0.10, 0.15, 1.0], dtype=np.float32)
 
     # ---------------- Camera ----------------
     # IMPORTANT:
