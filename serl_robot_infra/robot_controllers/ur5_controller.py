@@ -58,7 +58,7 @@ class UrImpedanceController(threading.Thread):
         self.max_tcp_v = 0.15     # m/s
         self.max_tcp_w = 1.0      # rad/s
         self.max_qd    = 1.5      # rad/s
-        self.servo_gain = 300
+        self.servo_gain = 900.
         self.lookahead = 0.08
 
         # DLS damping parameters
@@ -95,7 +95,7 @@ class UrImpedanceController(threading.Thread):
         if hasattr(config, 'RESET_Q'):
             self.reset_Q = config.RESET_Q.flatten() # Flatten fixes the 2D array bug!
         else:
-            self.reset_Q = np.deg2rad(np.array([-88.0, -91.0, -130.0, -166.0, -90.0, 180.0], dtype=np.float32))  # reset state in Joint Space
+            self.reset_Q = np.deg2rad(np.array([-88.0, -91.0, -130.0, -166.0, -90.0, 0.0], dtype=np.float32))  # reset state in Joint Space
         self.reset_Pose = np.zeros_like(self.reset_Q)
         self.reset_height = np.array([0.1], dtype=np.float32)  # TODO make customizable
 
@@ -304,6 +304,7 @@ class UrImpedanceController(threading.Thread):
             return
 
         self.ur_control.forceModeStop()
+        self.ur_control.servoStop()
 
         print("[RIC] plotting")
         real_pos = np.array([pose2rotvec(q) for q in self.hist_data[0]])
@@ -365,8 +366,8 @@ class UrImpedanceController(threading.Thread):
             self.stop()
 
     async def _go_to_reset_pose(self):
-        self.ur_control.forceModeStop()
-
+        # self.ur_control.forceModeStop()
+        self.ur_control.servoStop()
         # first disable vaccum gripper
         if self.robotiq_gripper:
             await self.send_gripper_command(force_release=True)
@@ -399,7 +400,7 @@ class UrImpedanceController(threading.Thread):
         with self.lock:
             self.target_pos = self.curr_pos.copy()
 
-        self.ur_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
+        # self.ur_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
         self.ur_control.zeroFtSensor()
 
         if not success:     # restart if not successful
@@ -431,7 +432,7 @@ class UrImpedanceController(threading.Thread):
     async def run_async(self):
         await self.start_ur_interfaces(gripper=True)
 
-        self.ur_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
+        # self.ur_control.forceModeSetDamping(self.fm_damping)  # less damping = Faster
         try:
             dt = 1. / self.frequency
             self.ur_control.zeroFtSensor()
@@ -458,7 +459,7 @@ class UrImpedanceController(threading.Thread):
                     self.plot()
 
                 # calculate force
-                force = self._calculate_force()
+                # force = self._calculate_force()
                 # print(self.target_pos, self.curr_pos, force)
                 self.print(f" p:{self.curr_pos}   f:{self.curr_force_lowpass}   gr:{self.gripper_state}")  # log to file
                 # Update state already done: self.curr_pos, self.curr_vel, self.curr_Q
@@ -497,14 +498,13 @@ class UrImpedanceController(threading.Thread):
                 # servoJ runs joint-space servo (no forceMode involved) :contentReference[oaicite:8]{index=8}
                 self.ur_control.servoJ(
                     q_cmd,
-                    speed=1.0,
-                    acceleration=1.0,
-                    time=dt,
-                    lookahead_time=self.lookahead,
-                    gain=self.servo_gain,
+                    1.0,
+                    1.0,
+                    dt,
+                    self.lookahead,
+                    self.servo_gain,
                 )
-
-                
+            
                 if self.robotiq_gripper:
                     await self.send_gripper_command()
 
@@ -537,6 +537,7 @@ class UrImpedanceController(threading.Thread):
                 print(f"[RTDEPositionalController] >dt: {self.err}     <dt (good): {self.noerr}")
             # mandatory cleanup
             self.ur_control.forceModeStop()
+            self.ur_control.servoStop()
 
             # release gripper
             if self.robotiq_gripper:
@@ -550,7 +551,7 @@ class UrImpedanceController(threading.Thread):
             # move to real home
             pi = 3.1415
             # reset_Q = np.deg2rad([271.07, -93.98, -122.14, -166.376, 270.78, 180.0])
-            reset_Q = np.deg2rad([272.0, -91.0, -130.0, -166.0, 270.0, 180.0])
+            reset_Q = np.deg2rad([272.0, -91.0, -130.0, -166.0, 270.0, 0.0])
             self.ur_control.moveJ(reset_Q, speed=0.5, acceleration=0.5)
 
             # terminate

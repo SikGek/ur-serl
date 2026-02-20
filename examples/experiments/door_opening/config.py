@@ -79,8 +79,8 @@ class EnvConfig(DefaultEnvConfig):
     ERROR_DELTA: float = 0.05
     FORCEMODE_DAMPING: float = 0.2  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
-    # FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
-    FORCEMODE_SELECTION_VECTOR = np.array([1,1,1,0,0,0], dtype=np.int8)
+    FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
+    # FORCEMODE_SELECTION_VECTOR = np.array([1,1,1,0,0,0], dtype=np.int8)
     FORCEMODE_LIMITS = np.array([0.5, 0.5, 0.5, 1., 1., 1.])
     GRIPPER_USB_PORT = "/dev/ttyUSB0"
     GRIPPER_SLAVE_ID = 9
