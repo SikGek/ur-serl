@@ -205,7 +205,7 @@ class UR5Env(gym.Env):
                 image_space_definition["wrist_2"] = gym.spaces.Box(
                     0, 255, shape=(128, 128, channel), dtype=np.uint8
                 )
-            else:
+            if "shoulder" in config.REALSENSE_CAMERAS.keys():
                 image_space_definition["shoulder"] = gym.spaces.Box(
                     0, 255, shape=(128, 128, channel), dtype=np.uint8
                 )

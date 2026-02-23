@@ -65,6 +65,10 @@ class EnvConfig(DefaultEnvConfig):
             "serial_number": "239122070813",  
             "dim": (1280, 720),
         },
+        "wrist": {
+            "serial_number": "218622274722",  
+            "dim": (1280, 720),
+        },
     }
     # Optional: crop function to focus on the door region BEFORE resizing to 128x128.
     # You can implement this in UR5EDoorOpenEnv.crop_image() (see wrapper code below).
@@ -88,7 +92,7 @@ class EnvConfig(DefaultEnvConfig):
 
 class TrainConfig(DefaultTrainingConfig):
     # --- what the policy sees ---
-    image_keys = ["shoulder"]           # “wrist” key is actually your side camera
+    image_keys =["wrist", "shoulder"]           # “wrist” key is actually your side camera
     classifier_keys = ["shoulder"]      # use same camera for reward since you only have one
 
     proprio_keys = [
@@ -97,7 +101,6 @@ class TrainConfig(DefaultTrainingConfig):
         "tcp_force",
         "tcp_torque",
         "gripper_pose",     # optional if you expose it
-        # "gripper_object", # optional if you have a sensor
         "gripper_state",
     ]
 
