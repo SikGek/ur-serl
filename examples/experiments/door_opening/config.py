@@ -22,6 +22,7 @@ from experiments.door_opening.wrapper import (
     DoorManualResetWrapper,
     RewardClassifierTerminateWrapper,
     GripperPenaltyWrapper,
+    MultiStageRewardClassifierTerminateWrapper,
     # Optional:
     # TCPActionRelativeFrame,
     # RelativeFrame,
@@ -152,29 +153,66 @@ class TrainConfig(DefaultTrainingConfig):
         env = ChunkingWrapper(env, obs_horizon=1, act_exec_horizon=None)
 
         # ---- Binary reward classifier wrapper ----
+        # if classifier:
+        #     clf = load_classifier_func(
+        #         key=jax.random.PRNGKey(0),
+        #         sample=env.observation_space.sample(),
+        #         image_keys=self.classifier_keys,
+        #         checkpoint_path=self.classifier_ckpt_path,
+        #     )
+
+        #     def prob_func(obs):
+        #         logits = clf(obs)
+        #         logit0 = jnp.ravel(jnp.asarray(logits))[0]
+        #         return jax.nn.sigmoid(logit0)
+
+        #     env = RewardClassifierTerminateWrapper(
+        #         env,
+        #         prob_func,
+        #         threshold=self.clf_threshold,
+        #         consecutive=self.clf_consecutive,
+        #         target_hz=10,
+        #         trunc_penalty=00,
+        #         pass_env_reward=False,
+        #     )
         if classifier:
-            clf = load_classifier_func(
+            # Stage 0: grasp classifier
+            clf_grasp = load_classifier_func(
                 key=jax.random.PRNGKey(0),
                 sample=env.observation_space.sample(),
-                image_keys=self.classifier_keys,
-                checkpoint_path=self.classifier_ckpt_path,
+                image_keys=["wrist"],  # choose best view for grasp
+                checkpoint_path=os.path.abspath("classifier_ckpt/door_grasp/"),
             )
 
-            def prob_func(obs):
-                logits = clf(obs)
-                logit0 = jnp.ravel(jnp.asarray(logits))[0]
-                return jax.nn.sigmoid(logit0)
+            # Stage 1: door-open classifier
+            clf_open = load_classifier_func(
+                key=jax.random.PRNGKey(1),
+                sample=env.observation_space.sample(),
+                image_keys=["shoulder"],  # choose best view for door-open
+                checkpoint_path=os.path.abspath("classifier_ckpt/door_open_45deg/"),
+            )
 
-            env = RewardClassifierTerminateWrapper(
+            def prob_from_clf(clf_fn):
+                def _prob(obs):
+                    logits = clf_fn(obs)
+                    logit0 = jnp.ravel(jnp.asarray(logits))[0]
+                    return jax.nn.sigmoid(logit0)
+                return _prob
+
+            prob_grasp = prob_from_clf(clf_grasp)
+            prob_open  = prob_from_clf(clf_open)
+
+            env = MultiStageRewardClassifierTerminateWrapper(
                 env,
-                prob_func,
-                threshold=self.clf_threshold,
-                consecutive=self.clf_consecutive,
+                prob_funcs=[prob_grasp, prob_open],
+                thresholds=[0.8, 0.8],
+                consecutive=[3, 3],
+                stage_rewards=[0.2, 1.0],  # IMPORTANT: prevent “just grasp” local optimum
+                in_order=True,
                 target_hz=10,
-                trunc_penalty=00,
+                trunc_penalty=-1.0,
                 pass_env_reward=False,
             )
-
         # ---- Optional gripper penalty (discourage spam) ----
         env = GripperPenaltyWrapper(env, penalty=-0.02)
 
