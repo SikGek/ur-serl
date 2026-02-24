@@ -257,6 +257,8 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 client.update()
                 obs, _ = env.reset()
                 action_filter.reset()
+                if bool(reward):
+                    input("Press Enter to restart environment")
 
         if step > 0 and config.buffer_period > 0 and step % config.buffer_period == 0:
             # dump to pickle file

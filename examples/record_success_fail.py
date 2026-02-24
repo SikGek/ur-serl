@@ -22,10 +22,7 @@ def on_press(key):
     try:
         if str(key) == 'Key.space':
             success_key = True
-    except AttributeError:
-        pass
-    try:
-        if str(key) == 'Key.esc':
+        elif str(key) == 'Key.esc':
             fail_key = True
     except AttributeError:
         pass
@@ -39,6 +36,7 @@ def main(_):
     assert FLAGS.exp_name in CONFIG_MAPPING, 'Experiment folder not found.'
     config = CONFIG_MAPPING[FLAGS.exp_name]()
     env = config.get_environment(fake_env=False, save_video=False, classifier=False)
+    
     obs, _ = env.reset()
     successes = []
     failures = []
@@ -69,10 +67,11 @@ def main(_):
             success_key = False
         elif fail_key:
             failures.append(transition)
+            print("failure recorded")
             fail_key = False
 
-    # if done or truncated:
-    obs, _ = env.reset()
+        if done or truncated:
+            obs, _ = env.reset()
 
     if not os.path.exists("./classifier_data"):
         os.makedirs("./classifier_data")

@@ -36,7 +36,7 @@ class Robotiq2F85USBGripper:
         portname: str = "auto",
         slaveaddress: int = 9,
         default_speed: int = 255,
-        default_force: int = 150,
+        default_force: int = 200,
         cache_period_s: float = 0.02,
         emulate_vacuum_pressure: bool = False,
     ) -> None:

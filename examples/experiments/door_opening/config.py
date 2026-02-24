@@ -37,7 +37,7 @@ class EnvConfig(DefaultEnvConfig):
     # A safe joint reset pose that starts near the handle (example placeholder)
     RESET_Q = np.deg2rad(np.array([
         # [271.07, -93.98, -122.14, -166.376, 270.78, 180.0],
-        [272.0, -77.0, -130.0, -153.0, 270.0, 0.0],
+        [272.0, -77.0, -130.0, -150.0, 270.0, 180.0],
         # [180.0, -80.0, -130.0, -166.0, 270.0, 180.0],
     ], dtype=np.float32))
 
@@ -54,7 +54,7 @@ class EnvConfig(DefaultEnvConfig):
 
     # 2. Action Scales:
     # If the robot feels "sluggish" while opening, increase the translation scale.
-    ACTION_SCALE = np.array([0.1, 0.15, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.05, 0.1, 1.0], dtype=np.float32)
 
     # ---------------- Camera ----------------
     # IMPORTANT:
@@ -77,11 +77,11 @@ class EnvConfig(DefaultEnvConfig):
     #     "wrist": lambda img: img[0:720, 200:1000, :],  # (y0:y1, x0:x1)
     # }
 
-    MAX_EPISODE_LENGTH = 250
+    MAX_EPISODE_LENGTH = 200
 
     GRIPPER_TIMEOUT = 5000  # in milliseconds
     ERROR_DELTA: float = 0.05
-    FORCEMODE_DAMPING: float = 0.0  # faster
+    FORCEMODE_DAMPING: float = 0.08  # faster
     FORCEMODE_TASK_FRAME = np.zeros(6)
     FORCEMODE_SELECTION_VECTOR = np.ones(6, dtype=np.int8)
     # FORCEMODE_SELECTION_VECTOR = np.array([1,1,1,0,0,0], dtype=np.int8)
@@ -106,17 +106,17 @@ class TrainConfig(DefaultTrainingConfig):
 
     # --- RL hyperparams (match the paper’s typical settings) ---
     encoder_type = "resnet-pretrained"
-    discount = 0.98           # good for ~100 step horizons:contentReference[oaicite:19]{index=19}
+    discount = 0.997         # good for ~100 step horizons:contentReference[oaicite:19]{index=19}
     cta_ratio = 2
     random_steps = 0
 
     setup_mode = "single-arm-learned-gripper"  # or fixed gripper if you don't want discrete gripper
 
     # Reward classifier checkpoint folder
-    classifier_ckpt_path = os.path.abspath("classifier_ckpt/door_open_45deg/")
+    classifier_ckpt_path = os.path.abspath("classifier_ckpt/")
 
     # Reward classifier decision
-    clf_threshold = 0.8
+    clf_threshold = 0.92
     clf_consecutive = 3       # require 3 consecutive frames above threshold
 
     def get_environment(self, fake_env=False, save_video=False, classifier=True):
@@ -137,7 +137,7 @@ class TrainConfig(DefaultTrainingConfig):
         # ---- Human interventions ----
         if not fake_env:
             env = SpacemouseIntervention(env)
-        env = RelativeFrame(env)
+        # env = RelativeFrame(env)
         # ---- (Optional) Make policy actions TCP-frame consistent ----
         # If your low-level controller expects base-frame deltas but you want TCP-frame actions:
         # env = TCPActionRelativeFrame(env)  # converts TCP-frame action -> base-frame action
@@ -171,7 +171,7 @@ class TrainConfig(DefaultTrainingConfig):
                 threshold=self.clf_threshold,
                 consecutive=self.clf_consecutive,
                 target_hz=10,
-                trunc_penalty=-1.0,
+                trunc_penalty=00,
                 pass_env_reward=False,
             )
 

@@ -17,7 +17,7 @@ def main(_):
     assert FLAGS.exp_name in CONFIG_MAPPING, 'Experiment folder not found.'
     print(FLAGS.exp_name)
     config = CONFIG_MAPPING[FLAGS.exp_name]()
-    env = config.get_environment(fake_env=False, save_video=False, classifier=False)
+    env = config.get_environment(fake_env=False, save_video=False, classifier=True)
     
     obs, info = env.reset()
     print("Reset done")
@@ -52,12 +52,17 @@ def main(_):
         pbar.set_description(f"Return: {returns}")
         print("\n\n\n REWARD IS:", rew, "\n\n\n")
         obs = next_obs
-        if done:
-            # if info["succeed"]:
-            #     for transition in trajectory:
-            #         transitions.append(copy.deepcopy(transition))
-            #     success_count += 1
-            #     pbar.update(1)
+        if done:        
+            if info["succeed"]:
+                for transition in trajectory:
+                    transitions.append(copy.deepcopy(transition))
+                success_count += 1
+                pbar.update(1)
+                trajectory = []
+                returns = 0
+                obs, info = env.reset()
+                input("Enter to restart environment")
+                continue
             trajectory = []
             returns = 0
             obs, info = env.reset()

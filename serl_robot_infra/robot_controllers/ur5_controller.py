@@ -114,7 +114,7 @@ class UrImpedanceController(threading.Thread):
     async def start_ur_interfaces(self, gripper=True):
         self.ur_control = RTDEControlInterface(self.robot_ip)
         self.ur_receive = RTDEReceiveInterface(self.robot_ip)
-        self.ur_control.setTcp([0.0, 0.0, 0.16, 0.0, 0.0, 0.0])
+        self.ur_control.setTcp([0.0, 0.0, 0.2, 0.0, 0.0, 0.0])
         # port = getattr(self.config, "GRIPPER_USB_PORT", "auto")
         # slave = getattr(self.config, "GRIPPER_SLAVE_ADDRESS", 9)
         if gripper:
@@ -264,10 +264,22 @@ class UrImpedanceController(threading.Thread):
         diff_d = np.clip(- curr_vel[:3], a_min=-vel_delta, a_max=vel_delta)
         force_pos = kp * diff_p + kd * diff_d
 
-        # calc torque
+        # # calc torque
+        # rot_diff = R.from_quat(target_pos[3:]) * R.from_quat(curr_pos[3:]).inv()
+        # vel_rot_diff = R.from_rotvec(curr_vel[3:]).inv()
+        # torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22  # TODO make customizable
+
         rot_diff = R.from_quat(target_pos[3:]) * R.from_quat(curr_pos[3:]).inv()
-        vel_rot_diff = R.from_rotvec(curr_vel[3:]).inv()
-        torque = rot_diff.as_rotvec() * 100 + vel_rot_diff.as_rotvec() * 22  # TODO make customizable
+        p_torque = rot_diff.as_rotvec() * 100.0
+        
+        # 2. Derivative Term (Damping)
+        # Angular velocity is already a 3D vector in the Base frame. 
+        # Error = (Target Velocity - Current Velocity). Assuming Target Vel = 0:
+        d_torque = -curr_vel[3:] * 22.0
+        
+        # 3. Combined Torque
+        torque = p_torque + d_torque
+
 
         # check for big downward tcp force and adapt accordingly
         if self.curr_force[2] > 3.5 and force_pos[2] < 0.:

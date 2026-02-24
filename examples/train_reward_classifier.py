@@ -43,12 +43,25 @@ def main(_):
     success_paths = glob.glob(os.path.join(os.getcwd(), "classifier_data", "*success*.pkl"))
     for path in success_paths:
         success_data = pkl.load(open(path, "rb"))
-        for trans in success_data:
+        for i, trans in enumerate(success_data):
             if "images" in trans['observations'].keys():
                 continue
             trans["labels"] = 1
             trans['actions'] = env.action_space.sample()
-            # print(trans)
+            # def print_dict_structure(d, indent=0):
+            #     for key, value in d.items():
+            #         print('  ' * indent + str(key))
+            #         if isinstance(value, dict):
+            #             print_dict_structure(value, indent + 1)
+
+            # print("--- Buffer Expectation (first element) ---")
+            # # This shows what the buffer thinks a transition should look like
+            # print_dict_structure(pos_buffer.dataset_dict['observations'], 1)
+
+            # print("\n--- Actual Data (trans) ---")
+            # # This shows what you are actually trying to shove in
+            # print_dict_structure(trans['observations'], 1)
+            # input(i)
             pos_buffer.insert(trans)
             
     pos_iterator = pos_buffer.get_iterator(

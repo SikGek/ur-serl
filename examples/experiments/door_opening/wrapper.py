@@ -171,28 +171,28 @@ class ToMrpWrapper(gym.ObservationWrapper):
 
 class RewardClassifierTerminateWrapper(gym.Wrapper):
     """
-    - prob_func(obs) -> success probability in [0,1]
-    - reward = 1.0 iff prob >= threshold for 'consecutive' steps
-    - terminate episode on success (unless truncated)
+    Classifier -> binary reward + terminate on success.
+    Adds truncation penalty so safety truncations matter to learning.
     """
-
     def __init__(
         self,
-        env: gym.Env,
-        prob_func: Callable[[dict], jax.Array],
-        threshold: float = 0.8,
-        consecutive: int = 3,
-        target_hz: Optional[float] = 10.0,
-        trunc_penalty: float = -1.0,
-        pass_env_reward: bool = False,
+        env,
+        prob_func,
+        threshold=0.85,
+        consecutive=2,
+        target_hz=None,
+        trunc_penalty=-1.0,     # <-- IMPORTANT
+        pass_env_reward=False,   # optional: add env shaping (usually False for HIL-SERL)
+        debug_print_every=0,     # 0 = never
     ):
         super().__init__(env)
         self.prob_func = prob_func
         self.threshold = float(threshold)
         self.consecutive = int(consecutive)
-        self.target_hz = float(target_hz) if target_hz is not None else None
+        self.target_hz = target_hz
         self.trunc_penalty = float(trunc_penalty)
         self.pass_env_reward = bool(pass_env_reward)
+        self.debug_print_every = int(debug_print_every)
 
         self._streak = 0
         self._step_i = 0
@@ -203,11 +203,14 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         self._step_i = 0
         info["succeed"] = False
         info["reward_clf_prob"] = 0.0
+        info["reward_clf_pos"] = False
+        info["reward_clf_success"] = False
         return obs, info
 
-    def _to_float(self, x) -> float:
+    def _to_float_scalar(self, x) -> float:
         x_host = jax.device_get(x)
-        return float(np.asarray(x_host).reshape(-1)[0])
+        arr = np.asarray(x_host).reshape(-1)
+        return float(arr[0])
 
     def step(self, action):
         t0 = time.time()
@@ -215,13 +218,12 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
 
         obs, env_reward, terminated, truncated, info = self.env.step(action)
 
-        # classifier probability
-        p = self._to_float(self.prob_func(obs))
+        # --- Classifier probability ---
+        p = self._to_float_scalar(self.prob_func(obs))
         p = float(np.clip(p, 0.0, 1.0))
-
         is_pos = (p >= self.threshold)
 
-        # consecutive success logic
+        # --- Hysteresis ---
         if truncated:
             self._streak = 0
             success = False
@@ -229,24 +231,39 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
             self._streak = (self._streak + 1) if is_pos else 0
             success = (self._streak >= self.consecutive)
 
-        # sparse reward
+        # --- Reward logic ---
+        clf_reward = 1.0 if success else 0.0
+
+        # Optional: keep env reward shaping in addition to classifier
         reward = float(env_reward) if self.pass_env_reward else 0.0
-        reward += 1.0 if success else 0.0
+        reward += clf_reward
+
+        # Apply truncation penalty AFTER everything
         if truncated:
             reward += self.trunc_penalty
 
-        # terminate on success (but don't override truncation)
+        # --- Termination logic ---
+        # Let success force termination (but do not override truncation)
         if success and not truncated:
             terminated = True
+
+        # If your base env incorrectly sets terminated=True when truncated,
+        # you can normalize:
         if truncated:
             terminated = False
 
+        # --- Info/debug ---
         info["succeed"] = bool(success)
         info["reward_clf_prob"] = p
         info["reward_clf_pos"] = bool(is_pos)
-        info["reward_clf_streak"] = int(self._streak)
+        info["reward_clf_success"] = bool(success)
+        info["env_reward"] = float(env_reward)
 
-        # rate control
+        if self.debug_print_every and (self._step_i % self.debug_print_every == 0):
+            print(f"[clf] p={p:.3f} pos={is_pos} streak={self._streak} success={success} "
+                  f"env_reward={float(env_reward):.3f} reward={reward:.3f} trunc={truncated}")
+
+        # --- Timing ---
         if self.target_hz is not None:
             time.sleep(max(0.0, 1.0 / self.target_hz - (time.time() - t0)))
 
