@@ -55,7 +55,7 @@ class EnvConfig(DefaultEnvConfig):
 
     # 2. Action Scales:
     # If the robot feels "sluggish" while opening, increase the translation scale.
-    ACTION_SCALE = np.array([0.05, 0.1, 1.0], dtype=np.float32)
+    ACTION_SCALE = np.array([0.08, 0.1, 1.0], dtype=np.float32)
 
     # ---------------- Camera ----------------
     # IMPORTANT:
@@ -107,17 +107,19 @@ class TrainConfig(DefaultTrainingConfig):
 
     # --- RL hyperparams (match the paper’s typical settings) ---
     encoder_type = "resnet-pretrained"
-    discount = 0.997         # good for ~100 step horizons:contentReference[oaicite:19]{index=19}
+    discount = 0.993         # good for ~100 step horizons:contentReference[oaicite:19]{index=19}
     cta_ratio = 2
     random_steps = 0
+    buffer_period = 1000
+    checkpoint_period = 2000
 
     setup_mode = "single-arm-learned-gripper"  # or fixed gripper if you don't want discrete gripper
 
     # Reward classifier checkpoint folder
-    classifier_ckpt_path = os.path.abspath("classifier_ckpt/")
+    classifier_ckpt_path = os.path.abspath("classifier_ckpt/stage_2")
 
     # Reward classifier decision
-    clf_threshold = 0.92
+    clf_threshold = 0.8
     clf_consecutive = 3       # require 3 consecutive frames above threshold
 
     def get_environment(self, fake_env=False, save_video=False, classifier=True):
@@ -172,7 +174,7 @@ class TrainConfig(DefaultTrainingConfig):
         #         threshold=self.clf_threshold,
         #         consecutive=self.clf_consecutive,
         #         target_hz=10,
-        #         trunc_penalty=00,
+        #         trunc_penalty=-1.0,
         #         pass_env_reward=False,
         #     )
         if classifier:
@@ -181,7 +183,7 @@ class TrainConfig(DefaultTrainingConfig):
                 key=jax.random.PRNGKey(0),
                 sample=env.observation_space.sample(),
                 image_keys=["wrist"],  # choose best view for grasp
-                checkpoint_path=os.path.abspath("classifier_ckpt/door_grasp/"),
+                checkpoint_path=os.path.abspath("classifier_ckpt/stage_1/"),
             )
 
             # Stage 1: door-open classifier
@@ -189,7 +191,7 @@ class TrainConfig(DefaultTrainingConfig):
                 key=jax.random.PRNGKey(1),
                 sample=env.observation_space.sample(),
                 image_keys=["shoulder"],  # choose best view for door-open
-                checkpoint_path=os.path.abspath("classifier_ckpt/door_open_45deg/"),
+                checkpoint_path=os.path.abspath("classifier_ckpt/stage_2/"),
             )
 
             def prob_from_clf(clf_fn):
@@ -205,12 +207,12 @@ class TrainConfig(DefaultTrainingConfig):
             env = MultiStageRewardClassifierTerminateWrapper(
                 env,
                 prob_funcs=[prob_grasp, prob_open],
-                thresholds=[0.8, 0.8],
+                thresholds=[0.85, 0.7],
                 consecutive=[3, 3],
-                stage_rewards=[0.2, 1.0],  # IMPORTANT: prevent “just grasp” local optimum
+                stage_rewards=[0.35, 1.0],  # IMPORTANT: prevent “just grasp” local optimum
                 in_order=True,
                 target_hz=10,
-                trunc_penalty=-1.0,
+                trunc_penalty=0.0,
                 pass_env_reward=False,
             )
         # ---- Optional gripper penalty (discourage spam) ----

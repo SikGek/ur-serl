@@ -344,62 +344,62 @@ class UR5Env(gym.Env):
 
         obs = self._get_obs(action)
 
-        reward = self.compute_reward(obs, action)
-
-        # Two different "episode ended" reasons:
-        controller_trunc = bool(self._is_truncated())  # safety stop, force limit, etc.
-        time_limit = bool(self.curr_path_length >= self.max_episode_length)
-
-        # Gymnasium semantics:
-        # - terminated: "true terminal" (success/failure). Base env has no success condition.
-        # - truncated: timeout or external truncation.
-        terminated = False
-        truncated = bool(controller_trunc or time_limit)
-
-        # Make sure cost infos get flushed on ANY episode boundary from the base env.
-        done_for_infos = bool(terminated or truncated)
-        info = self.get_cost_infos(done_for_infos)
-
-        # Optional but VERY useful for debugging/logging:
-        info["time_limit"] = time_limit
-        info["controller_trunc"] = controller_trunc
-
-        dt = time.time() - start_time
-        to_sleep = max(0, (1.0 / self.hz) - dt)
-        if to_sleep == 0:
-            warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
-        time.sleep(to_sleep)
-
-        return obs, float(reward), bool(terminated), bool(truncated), info
-
         # reward = self.compute_reward(obs, action)
-        # truncated = self._is_truncated()
-        # # succeed = bool(self.reached_goal_state(obs))
-        # # succeed = bool(self.reached_goal_state(obs))
-        # # reward = reward if not truncated else reward - 10.  # truncation penalty
-        # # print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
-        # done = self.curr_path_length >= self.max_episode_length or truncated
 
-        # # if not succeed:
-        # #     try:
-        # #         succeed = float(reward) > 0.0
-        # #     except Exception:
-        # #         succeed = False
-        # # if truncated:
-        # #     succeed = False
+        # # Two different "episode ended" reasons:
+        # controller_trunc = bool(self._is_truncated())  # safety stop, force limit, etc.
+        # time_limit = bool(self.curr_path_length >= self.max_episode_length)
 
-        # done_for_infos = done or truncated
-    
+        # # Gymnasium semantics:
+        # # - terminated: "true terminal" (success/failure). Base env has no success condition.
+        # # - truncated: timeout or external truncation.
+        # terminated = False
+        # truncated = bool(controller_trunc or time_limit)
 
+        # # Make sure cost infos get flushed on ANY episode boundary from the base env.
+        # done_for_infos = bool(terminated or truncated)
         # info = self.get_cost_infos(done_for_infos)
-        # # info["succeed"] = succeed
+
+        # # Optional but VERY useful for debugging/logging:
+        # info["time_limit"] = time_limit
+        # info["controller_trunc"] = controller_trunc
+
         # dt = time.time() - start_time
         # to_sleep = max(0, (1.0 / self.hz) - dt)
         # if to_sleep == 0:
         #     warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
         # time.sleep(to_sleep)
-        # # done = False
-        # return obs, float(reward), bool(done), bool(truncated), info
+
+        # return obs, float(reward), bool(terminated), bool(truncated), info
+
+        reward = self.compute_reward(obs, action)
+        truncated = self._is_truncated()
+        # succeed = bool(self.reached_goal_state(obs))
+        # succeed = bool(self.reached_goal_state(obs))
+        # reward = reward if not truncated else reward - 10.  # truncation penalty
+        # print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
+        done = self.curr_path_length >= self.max_episode_length or truncated
+
+        # if not succeed:
+        #     try:
+        #         succeed = float(reward) > 0.0
+        #     except Exception:
+        #         succeed = False
+        # if truncated:
+        #     succeed = False
+
+        done_for_infos = done or truncated
+    
+
+        info = self.get_cost_infos(done_for_infos)
+        # info["succeed"] = succeed
+        dt = time.time() - start_time
+        to_sleep = max(0, (1.0 / self.hz) - dt)
+        if to_sleep == 0:
+            warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
+        time.sleep(to_sleep)
+        # done = False
+        return obs, float(reward), bool(done), bool(truncated), info
 
     def compute_reward(self, obs, action) -> float:
         return 0.   # overwrite for each task

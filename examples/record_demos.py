@@ -52,7 +52,8 @@ def main(_):
         pbar.set_description(f"Return: {returns}")
         print("\n\n\n REWARD IS:", rew, "\n\n\n")
         obs = next_obs
-        if done:        
+        if done:
+            input("Enter to restart environment")        
             if info["succeed"]:
                 for transition in trajectory:
                     transitions.append(copy.deepcopy(transition))

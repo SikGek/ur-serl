@@ -114,7 +114,7 @@ class UrImpedanceController(threading.Thread):
     async def start_ur_interfaces(self, gripper=True):
         self.ur_control = RTDEControlInterface(self.robot_ip)
         self.ur_receive = RTDEReceiveInterface(self.robot_ip)
-        self.ur_control.setTcp([0.0, 0.0, 0.2, 0.0, 0.0, 0.0])
+        # self.ur_control.setTcp([0.0, 0.0, 0.16, 0.0, 0.0, 0.0])
         # port = getattr(self.config, "GRIPPER_USB_PORT", "auto")
         # slave = getattr(self.config, "GRIPPER_SLAVE_ADDRESS", 9)
         if gripper:

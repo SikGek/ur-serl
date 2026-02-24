@@ -6,12 +6,12 @@ import os
 def interactive_cleaner(file_path):
     with open(file_path, 'rb') as f:
         data = pickle.load(f)
-    # file_path2 = 'classifier_data/door_opening_failure_images_2026-02-23_19-18-01.pkl'
+    file_path2 = 'classifier_data/door_opening_failure_images_2026-02-24_21-05-24.pkl'
 
-    # with open(file_path2, 'rb') as f:
-    #     data2 = pickle.load(f)
-    # with open(file_path, 'wb') as f:
-    #     pickle.dump(data+data2, f)
+    with open(file_path2, 'rb') as f:
+        data2 = pickle.load(f)
+    with open(file_path, 'wb') as f:
+        pickle.dump(data+data2, f)
     indices_to_remove = []
     print("--- Controls ---")
     print("Any Key: Next Image")
@@ -64,5 +64,5 @@ def interactive_cleaner(file_path):
         print("No items were marked for deletion.")
 
 # Run it
-interactive_cleaner('classifier_data/door_opening_250_success_images_2026-02-23_19-21-48.pkl')
+interactive_cleaner('classifier_data/door_opening_failure_images_2026-02-24_21-07-31.pkl')
 

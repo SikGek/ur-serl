@@ -70,8 +70,9 @@ def main(_):
             print("failure recorded")
             fail_key = False
 
-        if done or truncated:
-            obs, _ = env.reset()
+        # if done or truncated:
+            
+    obs, _ = env.reset()
 
     if not os.path.exists("./classifier_data"):
         os.makedirs("./classifier_data")
