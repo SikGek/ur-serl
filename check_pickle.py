@@ -6,12 +6,12 @@ import os
 def interactive_cleaner(file_path):
     with open(file_path, 'rb') as f:
         data = pickle.load(f)
-    file_path2 = 'classifier_data/door_opening_failure_images_2026-02-24_21-05-24.pkl'
+    # file_path2 = 'classifier_data/door_opening_250_success_images_2026-02-24_21-29-20.pkl'
 
-    with open(file_path2, 'rb') as f:
-        data2 = pickle.load(f)
-    with open(file_path, 'wb') as f:
-        pickle.dump(data+data2, f)
+    # with open(file_path2, 'rb') as f:
+    #     data2 = pickle.load(f)
+    # with open(file_path, 'wb') as f:
+    #     pickle.dump(data+data2, f)
     indices_to_remove = []
     print("--- Controls ---")
     print("Any Key: Next Image")
@@ -23,7 +23,7 @@ def interactive_cleaner(file_path):
     for i, entry in enumerate(data):
         try:
             # Extract and Squeeze image
-            img = np.array(entry['observations']['shoulder']).squeeze()
+            img = np.array(entry['observations']['wrist']).squeeze()
             
             # Convert (C, H, W) to (H, W, C)
             if img.ndim == 3 and img.shape[0] == 3:
@@ -64,5 +64,5 @@ def interactive_cleaner(file_path):
         print("No items were marked for deletion.")
 
 # Run it
-interactive_cleaner('classifier_data/door_opening_failure_images_2026-02-24_21-07-31.pkl')
+interactive_cleaner('classifier_data/door_opening_300_success_images_2026-02-25_17-25-38.pkl')
 

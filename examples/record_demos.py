@@ -31,7 +31,7 @@ def main(_):
     while success_count < success_needed:
         # print("czech")
         actions = np.zeros(env.action_space.sample().shape) 
-        print(actions)
+        # print(actions)
         next_obs, rew, done, truncated, info = env.step(actions)
         returns += rew
         if "intervene_action" in info:
@@ -50,10 +50,10 @@ def main(_):
         trajectory.append(transition)
         
         pbar.set_description(f"Return: {returns}")
-        print("\n\n\n REWARD IS:", rew, "\n\n\n")
+        # print("\n\n\n REWARD IS:", rew, "\n\n\n")
         obs = next_obs
         if done:
-            input("Enter to restart environment")        
+            # input("Enter to restart environment")        
             if info["succeed"]:
                 for transition in trajectory:
                     transitions.append(copy.deepcopy(transition))
@@ -62,8 +62,8 @@ def main(_):
                 trajectory = []
                 returns = 0
                 obs, info = env.reset()
-                input("Enter to restart environment")
-                continue
+                # input("Enter to restart environment")
+                # continue
             trajectory = []
             returns = 0
             obs, info = env.reset()

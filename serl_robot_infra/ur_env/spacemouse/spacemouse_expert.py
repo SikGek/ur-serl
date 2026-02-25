@@ -33,5 +33,5 @@ class SpaceMouseExpert:
     def get_action(self) -> Tuple[np.ndarray, list]:
         """Returns the latest action and button state of the SpaceMouse."""
         with self.state_lock:
-            print(self.latest_data["action"])
+            # print(self.latest_data["action"])
             return self.latest_data["action"], self.latest_data["buttons"]

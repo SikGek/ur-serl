@@ -265,7 +265,8 @@ class RewardClassifierTerminateWrapper(gym.Wrapper):
         # --- Timing ---
         if self.target_hz is not None:
             time.sleep(max(0.0, 1.0 / self.target_hz - (time.time() - t0)))
-
+        if reward:
+            print(reward)
         return obs, reward, terminated, truncated, info
 
 

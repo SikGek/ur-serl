@@ -164,7 +164,7 @@ class UrImpedanceController(threading.Thread):
 
     def set_target_pos(self, target_pos: np.ndarray):
         if target_pos.shape == (7,):
-            print("\n", target_pos, "\n")
+            # print("\n", target_pos, "\n")
             target_orientation = target_pos[3:]
         elif target_pos.shape == (6,):
             target_orientation = rotvec_2_quat(target_pos[3:])

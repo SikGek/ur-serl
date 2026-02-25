@@ -472,7 +472,7 @@ class SpacemouseIntervention(gym.ActionWrapper):
 
     def adapt_spacemouse_output(self, action: np.ndarray) -> np.ndarray:
             position = self.unwrapped.curr_pos
-            print(position)
+            # print(position)
             # Extract the actual TCP orientation as a quaternion (the last 4 elements)
             tcp_quat = position[3:] 
             tcp_rot = R.from_quat(tcp_quat)
