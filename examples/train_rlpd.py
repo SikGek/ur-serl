@@ -66,14 +66,8 @@ def print_green(x):
 
 class EMAActionFilter:
     def __init__(self, hz: float, cutoff_hz: float = 2.0, filter_rot=True, filter_gripper=False):
-        self.dt = 1.0 / float(hz)
-        tau = 1.0 / (2.0 * math.pi * float(cutoff_hz))
-        self.alpha = self.dt / (tau + self.dt)
-        self.filter_rot = filter_rot
+        ...
         self.filter_gripper = filter_gripper
-        self.prev = None
-
-    def reset(self):
         self.prev = None
 
     def __call__(self, a: np.ndarray) -> np.ndarray:
@@ -83,15 +77,16 @@ class EMAActionFilter:
             self.prev = a.copy()
             return a
 
-        # Filter only the continuous parts: usually first 6 dims (xyz + rot)
-        idx_end = 6
+        # Filter continuous part: up to first 6 dims if present
+        idx_end = min(6, a.shape[0])
         self.prev[:idx_end] = self.prev[:idx_end] + self.alpha * (a[:idx_end] - self.prev[:idx_end])
 
-        # Gripper: typically leave as-is (discrete-ish)
-        if self.filter_gripper:
-            self.prev[6] = self.prev[6] + self.alpha * (a[6] - self.prev[6])
-        else:
-            self.prev[6] = a[6]
+        # Only touch gripper if it exists
+        if a.shape[0] > 6:
+            if self.filter_gripper:
+                self.prev[6] = self.prev[6] + self.alpha * (a[6] - self.prev[6])
+            else:
+                self.prev[6] = a[6]
 
         return np.clip(self.prev, -1.0, 1.0).astype(np.float32)
 

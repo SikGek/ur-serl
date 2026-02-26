@@ -4,6 +4,7 @@
 # from experiments.egg_flip.config import TrainConfig as EggFlipTrainConfig
 from experiments.box_picking.config import TrainConfig as UR5EArucoPickTrainConfig
 from experiments.door_opening.config import TrainConfig as DoorOpeningTrainConfig
+from experiments.door_gripping.config import TrainConfig as DoorGrippingTrainConfig
 
 CONFIG_MAPPING = {
                 # "ram_insertion": RAMInsertionTrainConfig,
@@ -12,4 +13,5 @@ CONFIG_MAPPING = {
                 # "egg_flip": EggFlipTrainConfig,
                 "ur5e_aruco_pick": UR5EArucoPickTrainConfig,
                 "door_opening": DoorOpeningTrainConfig,
+                "door_gripping": DoorGrippingTrainConfig,
                }

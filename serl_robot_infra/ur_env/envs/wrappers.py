@@ -1,4 +1,5 @@
 import gymnasium as gym
+from matplotlib.dviread import Box
 import numpy as np
 from agentlace import action
 
@@ -636,3 +637,92 @@ class ObservationRotationWrapper(gym.Wrapper):
         rotated_action = action.copy()
         rotated_action[:6] = rotate_state(action[:6], 4 - self.num_rot_quadrant)  # rotate
         return rotated_action
+
+
+# class GripperCloseEnv(gym.ActionWrapper):
+#     """
+#     Use this wrapper to task that requires the gripper to be closed
+#     """
+
+#     def __init__(self, env):
+#         super().__init__(env)
+#         ub = self.env.action_space
+#         assert ub.shape == (7,)
+#         self.action_space = Box(ub.low[:6], ub.high[:6])
+
+#     def action(self, action: np.ndarray) -> np.ndarray:
+#         new_action = np.zeros((7,), dtype=np.float32)
+#         new_action[:6] = action.copy()
+#         return new_action
+
+#     def step(self, action):
+#         new_action = self.action(action)
+#         obs, rew, done, truncated, info = self.env.step(new_action)
+#         if "intervene_action" in info:
+#             info["intervene_action"] = info["intervene_action"][:6]
+#         return obs, rew, done, truncated, info
+    
+#     def reset(self, **kwargs):
+#         return self.env.reset(**kwargs)
+    
+import numpy as np
+import gymnasium as gym
+from gymnasium.spaces import Box
+
+class GripperCloseEnv(gym.ActionWrapper):
+    """
+    Policy outputs 6D actions (xyz + rot/mrp), wrapper expands to 7D by
+    appending a fixed gripper action.
+
+    By default fixed_gripper_action=0.0 -> "no gripper command".
+    """
+    def __init__(self, env: gym.Env, fixed_gripper_action: float = 0.0):
+        super().__init__(env)
+
+        assert isinstance(self.env.action_space, Box), "Underlying action_space must be Box"
+        assert self.env.action_space.shape == (7,), f"Expected underlying action shape (7,), got {self.env.action_space.shape}"
+
+        self.fixed_gripper_action = float(fixed_gripper_action)
+
+        low = np.asarray(self.env.action_space.low[:6], dtype=np.float32)
+        high = np.asarray(self.env.action_space.high[:6], dtype=np.float32)
+
+        self.action_space = Box(low=low, high=high, dtype=np.float32)
+
+    def action(self, action: np.ndarray) -> np.ndarray:
+        a = np.asarray(action, dtype=np.float32).reshape(-1)
+        if a.shape[0] != 6:
+            raise ValueError(f"GripperCloseEnv expected 6D action, got shape {a.shape}")
+
+        new_action = np.zeros((7,), dtype=np.float32)
+        new_action[:6] = a
+
+        # clamp fixed gripper value into env bounds just in case
+        g_low = float(np.asarray(self.env.action_space.low[6]))
+        g_high = float(np.asarray(self.env.action_space.high[6]))
+        new_action[6] = float(np.clip(self.fixed_gripper_action, g_low, g_high))
+        return new_action
+
+    def step(self, action):
+        new_action = self.action(action)
+
+        out = self.env.step(new_action)
+        if len(out) == 5:
+            obs, rew, terminated, truncated, info = out
+        elif len(out) == 4:
+            # fallback for older gym envs
+            obs, rew, done, info = out
+            terminated, truncated = bool(done), False
+        else:
+            raise RuntimeError(f"Unexpected env.step() return length: {len(out)}")
+
+        # Keep intervention action consistent with the *policy* action space (6D)
+        if isinstance(info, dict) and "intervene_action" in info and info["intervene_action"] is not None:
+            ia = np.asarray(info["intervene_action"])
+            if ia.shape[-1] == 7:
+                info["intervene_action"] = ia[..., :6]
+
+        if isinstance(info, dict):
+            info["fixed_gripper_action"] = self.fixed_gripper_action
+
+        return obs, rew, terminated, truncated, info

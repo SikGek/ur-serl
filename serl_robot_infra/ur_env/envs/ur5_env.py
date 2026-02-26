@@ -229,9 +229,7 @@ class UR5Env(gym.Env):
 
         state_space = gym.spaces.Dict(
             {
-                "tcp_pose": gym.spaces.Box(
-                    -np.inf, np.inf, shape=(6,)
-                ),  # xyz + rotvec
+                "tcp_pose": gym.spaces.Box(-np.inf, np.inf, shape=(7,)),  # xyz + quat
                 "tcp_vel": gym.spaces.Box(-np.inf, np.inf, shape=(6,)),
                 "gripper_state": gym.spaces.Box(-1., 1., shape=(2,)),
                 "tcp_force": gym.spaces.Box(-np.inf, np.inf, shape=(3,)),
