@@ -11,7 +11,8 @@ import jax.numpy as jnp
 
 from ur_env.envs.ur5_env import UR5Env
 from ur_env.utils.rotations import quat_2_mrp
-
+from ur_env.camera.video_capture import VideoCapture
+from ur_env.camera.rs_capture import RSCapture
 
 # -----------------------------
 # Base task env (same idea)
@@ -55,7 +56,34 @@ class UR5EDoorPullEnv(UR5Env):
                 st.spaces["action"] = gym.spaces.Box(
                     -1.0, 1.0, shape=self.action_space.shape, dtype=np.float32
                 )
+    def init_cameras(self, name_serial_dict=None):
+        if self.cap is not None:
+            self.close_cameras()
 
+        self.cap = {}
+        for cam_name, cam_spec in name_serial_dict.items():
+            rgb = self.camera_mode in ["rgb", "both", "grey"]
+            depth = self.camera_mode in ["depth", "both"]
+            pointcloud = self.camera_mode in ["pointcloud"]
+
+            if isinstance(cam_spec, str):
+                kwargs = {"serial_number": cam_spec}
+            else:
+                kwargs = dict(cam_spec)
+                # normalize key name
+                if "serial" in kwargs and "serial_number" not in kwargs:
+                    kwargs["serial_number"] = kwargs.pop("serial")
+
+            cap = VideoCapture(
+                RSCapture(name=cam_name, rgb=rgb, depth=depth, pointcloud=pointcloud, **kwargs)
+            )
+            self.cap[cam_name] = cap
+            
+    def crop_image(self, name: str, image: np.ndarray) -> np.ndarray:
+        # Optional task-specific crop: config.IMAGE_CROP[name](img)
+        if hasattr(self.task_cfg, "IMAGE_CROP") and name in self.task_cfg.IMAGE_CROP:
+            return self.task_cfg.IMAGE_CROP[name](image)
+        return super().crop_image(name, image)
     def _get_obs(self, action) -> dict:
         images = None
         if self.camera_mode is not None:
@@ -113,6 +141,8 @@ class DoorPullManualResetWrapper(gym.Wrapper):
         self.prompt_every_reset = bool(prompt_every_reset)
 
     def reset(self, **kwargs):
+        self.env.unwrapped._send_gripper_command(np.array([-1.0]))
+        time.sleep(0.4)
         if self.prompt_every_reset:
             input(
                 "\n[RESET - PULL] Close the door fully.\n"

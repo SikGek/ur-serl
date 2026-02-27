@@ -66,7 +66,10 @@ def print_green(x):
 
 class EMAActionFilter:
     def __init__(self, hz: float, cutoff_hz: float = 2.0, filter_rot=True, filter_gripper=False):
-        ...
+        self.dt = 1.0 / float(hz)
+        tau = 1.0 / (2.0 * math.pi * float(cutoff_hz))
+        self.alpha = self.dt / (tau + self.dt)
+        self.filter_rot = filter_rot
         self.filter_gripper = filter_gripper
         self.prev = None
 
@@ -89,6 +92,8 @@ class EMAActionFilter:
                 self.prev[6] = a[6]
 
         return np.clip(self.prev, -1.0, 1.0).astype(np.float32)
+    def reset(self):
+        self.prev = None
 
 
 def actor(agent, data_store, intvn_data_store, env, sampling_rng):
@@ -120,7 +125,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                     seed=key
                 )
                 actions = np.asarray(jax.device_get(actions))
-                # print(actions)
+                actions = action_filter(actions)
                 next_obs, reward, done, truncated, info = env.step(actions)
                 obs = next_obs
 
@@ -129,7 +134,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                         dt = time.time() - start_time
                         time_list.append(dt)
                         print(dt)
-
+                    action_filter.reset()
                     success_counter += reward
                     print(reward)
                     print(f"{success_counter}/{episode + 1}")
@@ -196,7 +201,7 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 )
                 actions = np.asarray(jax.device_get(actions))
                 actions = action_filter(actions)
-                print("policy action is: ", actions, "\n")
+                # print("policy action is: ", actions, "\n")
 
         # Step environment
         with timer.context("step_env"):
@@ -252,8 +257,8 @@ def actor(agent, data_store, intvn_data_store, env, sampling_rng):
                 client.update()
                 obs, _ = env.reset()
                 action_filter.reset()
-                if bool(reward):
-                    input("Press Enter to restart environment")
+                # if bool(reward):
+                    # input("Press Enter to restart environment")
 
         if step > 0 and config.buffer_period > 0 and step % config.buffer_period == 0:
             # dump to pickle file

@@ -11,7 +11,7 @@ class RSCapture:
 
     def __init__(self, name, serial_number, dim=(640, 480), fps=15, rgb=True, depth=False, pointcloud=False):
         self.name = name
-        # print(self.get_device_serial_numbers())
+        print(serial_number)
         print(self.get_device_serial_numbers())
         assert serial_number in self.get_device_serial_numbers()
         self.serial_number = serial_number

@@ -691,11 +691,14 @@ class GripperCloseEnv(gym.ActionWrapper):
 
     def action(self, action: np.ndarray) -> np.ndarray:
         a = np.asarray(action, dtype=np.float32).reshape(-1)
+        print(action)
+        if a.shape[0] == 7:
+            a = a[:6]
         if a.shape[0] != 6:
             raise ValueError(f"GripperCloseEnv expected 6D action, got shape {a.shape}")
 
         new_action = np.zeros((7,), dtype=np.float32)
-        new_action[:6] = a
+        new_action[:6] = a.copy()
 
         # clamp fixed gripper value into env bounds just in case
         g_low = float(np.asarray(self.env.action_space.low[6]))

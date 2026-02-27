@@ -342,10 +342,10 @@ class UrImpedanceController(threading.Thread):
 
     def _truncate_check(self):
         downward_force = self.curr_force_lowpass[2] > 30.
-        if downward_force:  # TODO add better criteria
-            self._is_truncated.set()
-        else:
-            self._is_truncated.clear()
+        # if downward_force:  # TODO add better criteria
+        #     self._is_truncated.set()
+        # else:
+        self._is_truncated.clear()
 
     def is_truncated(self):
         return self._is_truncated.is_set()

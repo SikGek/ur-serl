@@ -548,6 +548,7 @@ class UR5Env(gym.Env):
             self.close_cameras()
 
         self.cap = OrderedDict()
+        print(name_serial_dict)
         for cam_name, cam_serial in name_serial_dict.items():
             print(f"cam serial: {cam_serial}")
             rgb = self.camera_mode in ["rgb", "both", "grey"]
