@@ -65,7 +65,7 @@ def print_green(x):
 ##############################################################################
 
 class EMAActionFilter:
-    def __init__(self, hz: float, cutoff_hz: float = 2.0, filter_rot=True, filter_gripper=False):
+    def __init__(self, hz: float, cutoff_hz: float = 2.0, filter_rot=True, filter_gripper=True):
         self.dt = 1.0 / float(hz)
         tau = 1.0 / (2.0 * math.pi * float(cutoff_hz))
         self.alpha = self.dt / (tau + self.dt)
