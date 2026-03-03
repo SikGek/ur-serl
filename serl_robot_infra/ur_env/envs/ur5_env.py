@@ -778,6 +778,6 @@ class UR5Env(gym.Env):
         if self.controller:
             self.controller.stop()
             # self.controller.join(timeout=2.0)
-        if self.pose_est:
-            self.box_pose_est.stop()
+        # if self.pose_est:
+        #     self.box_pose_est.stop()
         super().close()

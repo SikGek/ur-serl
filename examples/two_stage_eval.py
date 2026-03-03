@@ -98,7 +98,7 @@ flags.DEFINE_integer("checkpoint_step_stage2", 0, "Checkpoint step for stage-2 (
 
 # Rollouts
 flags.DEFINE_integer("n_trajs", 5, "How many rollouts to run.")
-flags.DEFINE_integer("max_steps_per_traj", 400, "Hard cap on steps per rollout (safety).")
+flags.DEFINE_integer("max_steps_per_traj", 500, "Hard cap on steps per rollout (safety).")
 flags.DEFINE_boolean("save_video", False, "Whether to save videos (if your env supports it).")
 
 # Action smoothing
@@ -120,7 +120,7 @@ flags.DEFINE_enum(
     "either = OR of both.",
 )
 flags.DEFINE_integer("stage1_min_steps", 10, "Don't allow switching before this many steps.")
-flags.DEFINE_integer("stage1_consecutive", 3, "How many consecutive 'success' checks to trigger switching.")
+flags.DEFINE_integer("stage1_consecutive", 5, "How many consecutive 'success' checks to trigger switching.")
 flags.DEFINE_float("stage1_closed_thresh", 0.7, "closed_norm threshold (0=open, 1=closed).")
 flags.DEFINE_float("stage1_obj_thresh", 0.5, "object_detected threshold (0/1 in your controller).")
 
@@ -131,8 +131,8 @@ flags.DEFINE_multi_string(
     None,
     "Optional image keys for stage-1 classifier (override). Can be repeated: --stage1_clf_image_keys=wrist ...",
 )
-flags.DEFINE_float("stage1_clf_threshold", 0.90, "Stage-1 classifier prob threshold.")
-flags.DEFINE_integer("stage1_clf_consecutive", 2, "Stage-1 classifier consecutive frames.")
+flags.DEFINE_float("stage1_clf_threshold", 0.95, "Stage-1 classifier prob threshold.")
+flags.DEFINE_integer("stage1_clf_consecutive", 5, "Stage-1 classifier consecutive frames.")
 
 # Stage-2 success condition (usually classifier)
 flags.DEFINE_enum(
@@ -147,8 +147,8 @@ flags.DEFINE_multi_string(
     None,
     "Optional image keys for stage-2 classifier (override). Can be repeated: --stage2_clf_image_keys=shoulder ...",
 )
-flags.DEFINE_float("stage2_clf_threshold", 0.90, "Stage-2 classifier prob threshold.")
-flags.DEFINE_integer("stage2_clf_consecutive", 2, "Stage-2 classifier consecutive frames.")
+flags.DEFINE_float("stage2_clf_threshold", 0.95, "Stage-2 classifier prob threshold.")
+flags.DEFINE_integer("stage2_clf_consecutive", 5, "Stage-2 classifier consecutive frames.")
 
 # Determinism
 flags.DEFINE_boolean("deterministic", True, "Use argmax=True for action sampling (recommended for real eval).")
@@ -435,7 +435,8 @@ def main(_):
             # ---- Step env ----
             next_obs, reward, terminated, truncated, info = env.step(a)
             obs = next_obs
-
+            terminated = False
+            truncated = False
             # ---- Stage switching logic ----
             if stage == 1:
                 # (A) Gripper sensor-based switch
@@ -477,12 +478,16 @@ def main(_):
 
             else:
                 # Stage-2 final success (classifier)
+                env.unwrapped.curr_path_length = 0
+                # env.unwrapped.max_episode_length = 120
                 if FLAGS.stage2_success_mode == "clf" and stage2_clf_fn is not None:
                     p2 = _sigmoid_prob(stage2_clf_fn(obs))
                     ok2 = (p2 >= FLAGS.stage2_clf_threshold)
                     clf2_streak = (clf2_streak + 1) if ok2 else 0
                     if clf2_streak >= FLAGS.stage2_clf_consecutive:
                         dt = time.time() - t0
+                        env.unwrapped._send_gripper_command(np.array([-1.0]))
+                        time.sleep(0.4)
                         print(f"[SUCCESS] Stage-2 classifier fired at step {step_in_ep} (t={dt:.1f}s).")
                         break
 
