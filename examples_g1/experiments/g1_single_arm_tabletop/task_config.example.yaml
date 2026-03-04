@@ -1,0 +1,76 @@
+# Copy this file to `task_config.yaml` and replace every placeholder with values from your
+# own G1 setup. The provided defaults are safe *examples*, not robot-specific truths.
+
+server_url: "http://127.0.0.1:5001"
+active_arm: "left"
+
+# Absolute path to your G1 29-DoF URDF is required only by the robot server, not by this
+# file. Keep the same end-effector frame name here for documentation consistency.
+ee_frame_name: "left_wrist_yaw_link"
+
+# Which images the policy and reward classifier consume.
+image_keys: ["side_1"]
+classifier_keys: ["side_1"]
+
+# Optional: choose which proprioceptive fields are flattened by SERLObsWrapper.
+proprio_keys:
+  - tcp_pose
+  - tcp_vel
+  - tcp_force
+  - tcp_torque
+  - q_arm
+  - dq_arm
+
+# SpaceMouse action scaling. Tune down further for very delicate tasks.
+action_scale:
+  translation: 0.01
+  rotation: 0.12
+
+# Cartesian reset and target poses, in pelvis-frame XYZ + Euler XYZ (radians).
+# Set these using `python ../../calibrate_g1_task.py --server_url ...`.
+reset_pose: [0.45, 0.18, 0.72, 3.14159, 0.0, 1.5708]
+target_pose: [0.52, 0.10, 0.68, 3.14159, 0.0, 1.5708]
+reward_threshold: [0.025, 0.025, 0.025, 0.20, 0.20, 0.20]
+
+# Joint-space homes used by `/jointreset`.
+reset_q_arm: [0.20, 0.45, 0.00, -1.10, 0.00, 0.35, 0.00]
+passive_arm_home_q: [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
+
+# Safety box in pelvis coordinates. Keep this conservative until you validate the frame.
+abs_pose_limit_low: [0.25, -0.10, 0.55, 2.40, -0.70, 0.80]
+abs_pose_limit_high: [0.70, 0.45, 0.95, 3.60, 0.70, 2.40]
+
+random_reset: true
+random_xy_range: 0.02
+random_rpy_range: 0.08
+
+display_image: true
+episode_length: 80
+reset_interpolation_time: 2.0
+post_reset_settle_sec: 0.5
+image_size: [128, 128]
+
+classifier_threshold: 0.85
+
+# HIL-SERL training hyperparameters.
+buffer_period: 1000
+checkpoint_period: 5000
+steps_per_update: 50
+replay_buffer_capacity: 200000
+batch_size: 256
+discount: 0.97
+max_steps: 1000000
+training_starts: 100
+log_period: 10
+encoder_type: "resnet-pretrained"
+
+# Camera configuration: use backend "opencv" for webcams / CSI bridges, or "realsense"
+# for Intel RealSense. Each crop is [y0, y1, x0, x1].
+cameras:
+  side_1:
+    backend: "opencv"
+    device: 0
+    width: 1280
+    height: 720
+    fps: 30
+    crop: [120, 620, 200, 1080]
