@@ -54,17 +54,17 @@ HIL-SERL provides a set of common libraries for users to train RL policies for r
 </p> -->
 
 ## Create a new task
-Create a new folder under examples/experiments, with the file: 
-config.py
-wrapppers.py
-run_actor.sh
-run_learner.sh
-The actor and learner scripts can just be copy and pasted with the respective directory and task names.
-The config should be respective to the robot, inheriting the default environment config.
-A class inheriting the training config that contains the create environment method. This method should initialize the robot environment and initialize all the necessary wrappers
-The wrappers should include the class inheriting the robot environment specific to the task. It also requires all of the gymnasium wrappers, such as the reward clasifier wrapper, rotation represntation wrapper and/or gripper penalty wrapper etc.
-Then, you need to register the task in the mappings.py under examples/experiments
-To register a new robot, you need to create a new gymnasium environment and a controller to send the robot interface the actions
+1. **Create a new folder under examples/experiments, with the file:**
+    - config.py
+    - wrapppers.py
+    - run_actor.sh
+    - run_learner.sh
+2. **The actor and learner scripts can just be copy and pasted with the respective directory and task names.**
+3. **The config should be respective to the robot, inheriting the default environment config.**
+4. **A class inheriting the training config that contains the create environment method. This method should initialize the robot environment and initialize all the necessary wrappers**
+5. **The wrappers should include the class inheriting the robot environment specific to the task. It also requires all of the gymnasium wrappers, such as the reward clasifier wrapper, rotation represntation wrapper and/or gripper penalty wrapper etc.**
+6. **Then, you need to register the task in the mappings.py under examples/experiments**
+7. **To register a new robot, you need to create a new gymnasium environment and a controller to send the robot interface the actions**
 
 
 ## Citation
