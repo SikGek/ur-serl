@@ -22,10 +22,6 @@ from experiments.door_gripping.wrapper import (
     DoorManualResetWrapper,
     RewardClassifierTerminateWrapper,
     GripperPenaltyWrapper,
-    MultiStageRewardClassifierTerminateWrapper,
-    # Optional:
-    # TCPActionRelativeFrame,
-    # RelativeFrame,
     ToMrpWrapper,
 )
 

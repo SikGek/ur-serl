@@ -183,38 +183,7 @@ class UR5EArucoPickEnv(UR5Env):
         if not has_obj:
             return False
         return float(self.curr_pos[2]) > float(self._box_center_base[2] + self.task_cfg.LIFT_DELTA_Z)
-
-    # def compute_reward(self, obs, action) -> float:
-    #     # Update from ArUco each step if possible
-    #     if not self._update_box_from_aruco():
-    #         return -0.01
-
-    #     if self.reached_goal_state(obs):
-    #         return 1.0  # IMPORTANT: your eval code treats reward as success
-
-    #     tcp = np.asarray(self.curr_pos[:3], dtype=np.float32)
-    #     pre = self._pregrasp_xyz()
-    #     grasp = self._grasp_xyz()
-    #     if pre is None or grasp is None:
-    #         return -0.01
-
-    #     d_pre = float(np.linalg.norm(tcp - pre))
-    #     d_grasp = float(np.linalg.norm(tcp - grasp))
-
-    #     shaped = -0.05 * d_pre - 0.10 * d_grasp
-
-    #     # small bonus for "closing near grasp"
-    #     if float(np.linalg.norm((tcp - grasp)[:2])) < float(self.task_cfg.GRASP_XY_TOL):
-    #         if abs(float(tcp[2] - grasp[2])) < float(self.task_cfg.GRASP_Z_TOL):
-    #             if action is not None and float(action[-1]) > 0.5:
-    #                 shaped += 0.05
-
-    #     if bool(self.gripper_state[1] > 0.5):
-    #         shaped += 0.10
-
-    #     return float(shaped)
-
-    # ---------- observation ----------
+    
     def _get_obs(self, action) -> dict:
         images = None
         if self.camera_mode is not None:

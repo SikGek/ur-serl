@@ -318,7 +318,7 @@ class UR5Env(gym.Env):
         self.cost_infos = {}
         return cost_infos
 
-    def step(self, action: np.ndarray) -> tuple:  # overwritten by box_placing_env.py
+    def step(self, action: np.ndarray) -> tuple:  
         """standard gym step function."""
         start_time = time.time()
         action = np.clip(action, self.action_space.low, self.action_space.high)
@@ -333,8 +333,6 @@ class UR5Env(gym.Env):
 
         gripper_action = action[6] * self.action_scale[2]
 
-        # safe_pos = self.clip_safety_box(next_pos)
-        # print(next_po)
         self._send_pos_command(next_pos)
         self._send_gripper_command(gripper_action)
 
@@ -342,40 +340,10 @@ class UR5Env(gym.Env):
 
         obs = self._get_obs(action)
 
-        # reward = self.compute_reward(obs, action)
-
-        # # Two different "episode ended" reasons:
-        # controller_trunc = bool(self._is_truncated())  # safety stop, force limit, etc.
-        # time_limit = bool(self.curr_path_length >= self.max_episode_length)
-
-        # # Gymnasium semantics:
-        # # - terminated: "true terminal" (success/failure). Base env has no success condition.
-        # # - truncated: timeout or external truncation.
-        # terminated = False
-        # truncated = bool(controller_trunc or time_limit)
-
-        # # Make sure cost infos get flushed on ANY episode boundary from the base env.
-        # done_for_infos = bool(terminated or truncated)
-        # info = self.get_cost_infos(done_for_infos)
-
-        # # Optional but VERY useful for debugging/logging:
-        # info["time_limit"] = time_limit
-        # info["controller_trunc"] = controller_trunc
-
-        # dt = time.time() - start_time
-        # to_sleep = max(0, (1.0 / self.hz) - dt)
-        # if to_sleep == 0:
-        #     warnings.warn(f"environment could not be within {self.hz} Hz, took {dt:.4f}s!")
-        # time.sleep(to_sleep)
-
-        # return obs, float(reward), bool(terminated), bool(truncated), info
 
         reward = self.compute_reward(obs, action)
         truncated = self._is_truncated()
-        # succeed = bool(self.reached_goal_state(obs))
-        # succeed = bool(self.reached_goal_state(obs))
-        # reward = reward if not truncated else reward - 10.  # truncation penalty
-        # print("\n\n\n", "REWARD IS:", reward, "\n\n\n")
+
         done = self.curr_path_length >= self.max_episode_length or truncated
 
         # if not succeed:
@@ -451,69 +419,6 @@ class UR5Env(gym.Env):
         else:
             self.curr_reset_pose[:] = reset_pose
             return np.zeros((2,))
-
-    def go_to_detected_box(self):
-        """"
-        function for the demo
-        """
-        if self.gripper_state[0] > 0.01:
-            reset_Q = self.curr_Q.copy()
-            reset_Q[:4] = [0., -np.pi / 2., np.pi / 2., -np.pi / 2.]
-            self._send_reset_command(reset_Q)
-            while not self.controller.is_reset():
-                time.sleep(0.1)  # wait for the reset operation
-
-            reset_Q[:4] = [np.pi / 2, -np.pi / 2., np.pi / 2., -np.pi / 2.]
-            self._send_reset_command(reset_Q)
-            while not self.controller.is_reset():
-                time.sleep(0.1)  # wait for the reset operation
-
-            # release the box
-            self._send_gripper_command(np.array(-1))
-            time.sleep(0.1)
-
-        # go back on top
-        reset_Q = [0., -np.pi / 2., np.pi / 2., -np.pi / 2., -np.pi / 2., 0.]
-        self._send_reset_command(reset_Q)
-        while not self.controller.is_reset():
-            time.sleep(0.1)  # wait for the reset operation
-        time.sleep(0.5)
-
-        def get_request(i=10):
-            if i == 0:
-                raise Exception("err")
-            try:
-                r = requests.get('http://192.168.56.2:5000/api/data')
-                r.raise_for_status()
-                boxes = r.json()
-                if len(boxes) == 0:
-                    time.sleep(0.1)
-                    return get_request(i)
-                else:
-                    return boxes
-
-            except (json.decoder.JSONDecodeError, requests.exceptions.HTTPError):
-                return get_request(i=i - 1)
-
-        boxes = get_request()
-
-        highest = list(boxes.keys())[np.argmax([b["world2box"]["pos"][1] for b in boxes.values()])]
-        box = boxes[highest]["world2box"]
-        print(f"pose: {[round(b, 2) for b in box['pos']]} {[round(b, 2) for b in box['rot']]}")
-
-        t = R.from_euler("xyz", [-np.pi / 2., np.pi, 0.])
-        pos = t.apply(np.array(box["pos"]) + np.array([0., 0.1 + boxes[highest]["size"][1] / 2., 0.]))
-        rot = (R.from_euler("xyz", t.apply(box["rot"])) * R.from_euler("xyz", [np.pi, 0., 0.])).as_rotvec()
-
-        init_pose = np.concatenate((pos, rot))
-
-        print(f"moving to {init_pose}")
-        self._send_taskspace_command(init_pose)
-        while not self.controller.is_reset():
-            time.sleep(0.1)  # wait for the reset operation
-
-        self._update_currpos()
-        self.curr_reset_pose[:] = self.curr_pos
 
     def reset(self, **kwargs):
         self.cycle_count += 1

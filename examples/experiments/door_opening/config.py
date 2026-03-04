@@ -54,8 +54,6 @@ class EnvConfig(DefaultEnvConfig):
 
     MAX_EPISODE_LENGTH = 120
 
-    # I strongly recommend NOT using 5000ms here.
-    # You want reset-close to always work, and you don't want grasp to "miss and wait 5s".
     GRIPPER_TIMEOUT = 500   # ms
 
     ERROR_DELTA: float = 0.05
@@ -69,10 +67,8 @@ class EnvConfig(DefaultEnvConfig):
 
 
 class TrainConfig(DefaultTrainingConfig):
-    # policy sees both
     image_keys = ["wrist", "shoulder"]
 
-    # classifier should be shoulder for "door opened enough"
     classifier_keys = ["shoulder"]
 
     proprio_keys = [
@@ -86,12 +82,10 @@ class TrainConfig(DefaultTrainingConfig):
 
     encoder_type = "resnet-pretrained"
 
-    # Pulling is longer horizon; 0.99 is a sane starting point
     discount = 0.985
     cta_ratio = 2
     random_steps = 0
 
-    # IMPORTANT: pulling stage has NO gripper action -> use fixed-gripper SAC
     setup_mode = "single-arm-fixed-gripper"
 
     classifier_ckpt_path = os.path.abspath("classifier_ckpt/stage_2/")
@@ -114,8 +108,6 @@ class TrainConfig(DefaultTrainingConfig):
 
         if not fake_env:
             env = SpacemouseIntervention(env)
-        # RAM-insertion-like assumption: start grasped
-
 
         # Keep relative action convention consistent with your other UR tasks
         # env = RelativeFrame(env)
@@ -151,12 +143,7 @@ class TrainConfig(DefaultTrainingConfig):
                 pass_env_reward=False,
             )
         env = DoorPullManualResetWrapper(env, prompt_every_reset=True)
-        # ---- THIS is the RAM insertion move ----
-        # Policy action space becomes 6D, gripper is held fixed (no commands) during episode.
 
         env = GripperCloseEnv(env)
-
-        # Optional: still allow spacemouse intervention in 6D (no gripper buttons)
-
 
         return env
