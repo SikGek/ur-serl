@@ -20,7 +20,7 @@ from ur_env.camera.video_capture import VideoCapture
 from ur_env.camera.rs_capture import RSCapture
 
 from ur_env.camera.utils import PointCloudFusion, CalibrationTread
-from ur_env.utils.pose_estimation import BoxPoseEstimation
+# from ur_env.utils.pose_estimation import BoxPoseEstimation
 
 from robot_controllers.ur5_controller import UrImpedanceController
 
@@ -261,8 +261,8 @@ class UR5Env(gym.Env):
         self.controller = UrImpedanceController(
             robot_ip=config.ROBOT_IP,
             frequency=config.CONTROLLER_HZ,
-            kp=15000,
-            kd=3300,
+            kp=5000,
+            kd=2200,
             config=config,
             verbose=False,
             plot=False,

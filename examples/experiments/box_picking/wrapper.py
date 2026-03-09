@@ -14,7 +14,7 @@ from ur_env.envs.ur5_env import UR5Env  # <- change if your UR5Env lives elsewhe
 from ur_env.camera.video_capture import VideoCapture
 from ur_env.camera.rs_capture import RSCapture
 
-from ur_env.utils.aruco_pose import ArucoPoseEstimator
+# from ur_env.utils.aruco_pose import ArucoPoseEstimator
 from ur_env.utils.transforms import (
     construct_homogeneous_matrix,
     construct_homogeneous_matrix_from_rvec_tvec,

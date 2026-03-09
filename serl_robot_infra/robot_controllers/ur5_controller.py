@@ -10,7 +10,7 @@ from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 
 # Lazy import to avoid circular dependency: config is imported inside __init__ where it's needed
-from ur_env.utils.vacuum_gripper import VacuumGripper
+# from ur_env.utils.vacuum_gripper import VacuumGripper
 # from ur_env.utils.robotiq2f_85 import Robotiq2F85Gripper
 from ur_env.utils.rotations import rotvec_2_quat, quat_2_rotvec, pose2rotvec, pose2quat
 from ur_env.utils.robotiq_usb import Robotiq2F85USBGripper as Robotiq2F85Gripper
